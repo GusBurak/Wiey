@@ -348,7 +348,7 @@ function openAddPage(meal) {
   document.getElementById("addTitle").textContent = meal ? "Modifier le repas" : "Ajouter un repas";
   document.getElementById("submitBtn").textContent = meal ? "Enregistrer les modifications" : "Enregistrer le repas";
   form.date.value = meal ? meal.date : iso(new Date());
-  form.type.value = meal ? meal.type : guessMealType();
+  form.type.value = meal ? meal.type : "Déjeuner"; // Déjeuner par défaut pour un nouveau repas
   if (meal) fillDraftFromMeal(meal);
   renderCourse();
   photoDrop.style.backgroundImage = draft.photo ? `url(${draft.photo})` : "";
@@ -407,13 +407,6 @@ function dataUrlToBlob(dataUrl) {
   } catch (e) { return null; }
 }
 
-function guessMealType() {
-  const h = new Date().getHours();
-  if (h < 11) return "Petit-déjeuner";
-  if (h < 15) return "Déjeuner";
-  if (h < 18) return "Goûter";
-  return "Dîner";
-}
 
 // ---------- Photo ----------
 // Redimensionnée pour ne pas saturer le stockage du navigateur
