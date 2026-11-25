@@ -108,7 +108,7 @@
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>
             Calendrier
           </a>
-          <h1>Ajouter un repas</h1>
+          <h1 id="addTitle">Ajouter un repas</h1>
         </header>
 
         <form id="addForm" class="add-form" novalidate>
@@ -168,6 +168,14 @@
               <div class="add-inline ac-wrap" id="preparerAddRow" hidden>
                 <input type="text" id="preparerNew" autocomplete="off">
                 <button type="button" class="small-btn" id="preparerNewOk">Ajouter</button>
+              </div>
+              <div class="near-row" id="nearRow" hidden>
+                <span class="hint"><span aria-hidden="true">📍</span> <span id="nearLabel"></span> · <button type="button" class="link-inline" id="nearBtn">choisir</button></span>
+                <div class="add-inline" id="nearEdit" hidden>
+                  <input type="text" id="nearInput" placeholder="Ta ville (ex. Lyon)" autocomplete="off">
+                  <button type="button" class="small-btn" id="nearOk">OK</button>
+                </div>
+                <span class="hint" id="nearStatus" aria-live="polite"></span>
               </div>
             </div>
           </section>
@@ -248,7 +256,7 @@
 
           <div class="form-actions">
             <a href="#" class="ghost-btn link-btn">Annuler</a>
-            <button type="submit" class="primary-btn">Enregistrer le repas</button>
+            <button type="submit" class="primary-btn" id="submitBtn">Enregistrer le repas</button>
           </div>
         </form>
       </div>

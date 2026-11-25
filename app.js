@@ -3,7 +3,7 @@
 // Les données sont stockées dans le navigateur (localStorage).
 // =====================================================
 
-const KEYS = { meals: "wiey.meals", people: "wiey.people", restaurants: "wiey.restaurants", restaurantInfo: "wiey.restaurantInfo" };
+const KEYS = { meals: "wiey.meals", people: "wiey.people", restaurants: "wiey.restaurants", restaurantInfo: "wiey.restaurantInfo", near: "wiey.near" };
 const MEAL_TYPES = ["Petit-déjeuner", "Déjeuner", "Goûter", "Dîner"];
 const TYPE_EMOJI = { "Petit-déjeuner": "🥐", "Déjeuner": "🥗", "Goûter": "🍎", "Dîner": "🍝" };
 const COURSES = ["Apéritif", "Entrée", "Plat", "Dessert"];
@@ -27,6 +27,7 @@ let meals = load(KEYS.meals, () => []);
 let people = load(KEYS.people, () => []);
 let restaurants = load(KEYS.restaurants, () => []);
 let restaurantInfo = load(KEYS.restaurantInfo, () => ({})); // nom du resto → adresse
+let nearPlace = load(KEYS.near, () => null); // { name, longitude, latitude } : ville de référence pour la recherche
 const saveMeals = () => save(KEYS.meals, meals);
 
 // Nettoyage unique : retire les repas d'exemple (identifiants « demo-… ») et les
@@ -85,11 +86,16 @@ const homeView = document.getElementById("homeView");
 const addView = document.getElementById("addView");
 
 function route() {
-  const adding = location.hash === "#ajouter";
+  // #ajouter = nouveau repas ; #modifier/<id> = modifier une fiche existante
+  const editMatch = location.hash.match(/^#modifier\/(.+)$/);
+  const editMeal = editMatch && meals.find(m => m.id === decodeURIComponent(editMatch[1]));
+  if (editMatch && !editMeal) { goHome(); return; }
+  const adding = location.hash === "#ajouter" || !!editMeal;
   homeView.hidden = adding;
   addView.hidden = !adding;
   document.querySelector(".menu-item").classList.toggle("active", !adding);
-  if (adding) openAddPage();
+  closeModals();
+  if (adding) openAddPage(editMeal || null);
   else refresh();
   document.querySelector(".content").scrollTop = 0;
   sidebar.classList.remove("open");
@@ -162,6 +168,7 @@ function showPreview(thumb) {
   const meal = meals.find(x => x.id === thumb.dataset.id);
   if (!meal) return;
   const stars = meal.rating ? ` · ★ ${meal.rating.toLocaleString("fr-FR")}` : "";
+  preview.classList.toggle("with-photo", !!meal.photo);
   preview.innerHTML = `
     <div class="preview-photo" style="background:${photoBg(meal)}">${photoHtml(meal)}</div>
     <div class="preview-info"><strong>${escapeHtml(meal.name)}</strong><span>${escapeHtml(mealMoment(meal))} · ${formatDate(meal.date)}${stars}</span></div>`;
@@ -203,11 +210,15 @@ function openDetail(id) {
     ${meal.recipeUrl && isWebLink(meal.recipeUrl) ? `<div class="detail-section"><h3>Recette</h3><p><a href="${escapeHtml(meal.recipeUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(meal.recipeUrl)}</a></p></div>` : ""}
     ${meal.improve ? `<div class="detail-section"><h3>À améliorer</h3><p>${escapeHtml(meal.improve)}</p></div>` : ""}
     ${meal.notes ? `<div class="detail-section"><h3>Notes</h3><p>${escapeHtml(meal.notes)}</p></div>` : ""}
-    <button class="danger-btn" data-delete="${escapeHtml(meal.id)}">Supprimer ce repas</button>`;
+    <div class="detail-actions">
+      <button class="primary-btn small" data-edit="${escapeHtml(meal.id)}">Modifier</button>
+      <button class="danger-btn" data-delete="${escapeHtml(meal.id)}">Supprimer ce repas</button>
+    </div>`;
   detailModal.hidden = false;
 }
 
 detailContent.addEventListener("click", e => {
+  if (e.target.dataset.edit) { location.hash = "modifier/" + encodeURIComponent(e.target.dataset.edit); return; }
   const id = e.target.dataset.delete;
   if (!id || !confirm("Supprimer ce repas ?")) return;
   meals = meals.filter(x => x.id !== id);
@@ -299,20 +310,31 @@ function resetDraft() {
   draft = { photo: null, photoBlob: null, preparer: "", rating: 0, sections: [{ id: newId(), name: "", items: [] }], course: "Plat", preparerAddress: "" };
 }
 
-function openAddPage() {
+function openAddPage(meal) {
   resetDraft();
   form.reset();
-  form.date.value = iso(new Date());
-  form.type.value = guessMealType();
+  draft.editingId = meal ? meal.id : null;
+  document.getElementById("addTitle").textContent = meal ? "Modifier le repas" : "Ajouter un repas";
+  document.getElementById("submitBtn").textContent = meal ? "Enregistrer les modifications" : "Enregistrer le repas";
+  form.date.value = meal ? meal.date : iso(new Date());
+  form.type.value = meal ? meal.type : guessMealType();
+  if (meal) fillDraftFromMeal(meal);
   renderCourse();
-  photoDrop.style.backgroundImage = "";
-  photoDrop.classList.remove("has-photo");
+  photoDrop.style.backgroundImage = draft.photo ? `url(${draft.photo})` : "";
+  photoDrop.classList.toggle("has-photo", !!draft.photo);
   document.querySelectorAll(".add-form .invalid").forEach(el => el.classList.remove("invalid"));
   document.querySelectorAll(".field-error").forEach(el => (el.hidden = true));
   preparerAddRow.hidden = true;
   preparerNew.value = "";
   closePlaceList();
   lastRemote = { query: "", results: [], status: "" };
+  if (meal) {
+    preparedBy.value = meal.preparedBy || "Moi";
+    draft.preparer = meal.preparer || "";
+    draft.preparerAddress = meal.preparerAddress || "";
+    // Un proche / resto supprimé de la liste entre-temps : on le remet pour pouvoir le garder
+    if (draft.preparer && preparedBy.value !== "Moi" && !preparerList().includes(draft.preparer)) preparerList().push(draft.preparer);
+  }
   renderPreparer();
   renderStars();
   closeSectionChooser();
@@ -320,6 +342,38 @@ function openAddPage() {
   renamingId = null;
   renderIngredients();
   updateAnalyzeState();
+}
+
+// Pré-remplit le brouillon à partir d'une fiche existante
+function fillDraftFromMeal(meal) {
+  form.name.value = meal.name || "";
+  form.recipeUrl.value = meal.recipeUrl || "";
+  form.improve.value = meal.improve || "";
+  form.notes.value = meal.notes || "";
+  draft.photo = meal.photo || null;
+  draft.photoBlob = meal.photo ? dataUrlToBlob(meal.photo) : null;
+  draft.rating = meal.rating || 0;
+  draft.course = meal.course || "Plat";
+  const ingredients = meal.ingredients || [];
+  qtyToggle.checked = ingredients.some(i => i.qty);
+  const groups = new Map();
+  ingredients.forEach(i => { const g = i.group || ""; if (!groups.has(g)) groups.set(g, []); groups.get(g).push(i); });
+  draft.sections = [{ id: newId(), name: "", items: [] }];
+  for (const [g, items] of groups) {
+    const section = g ? { id: newId(), name: g, items: [], open: false } : draft.sections[0];
+    if (g) draft.sections.push(section);
+    section.items = items.map(i => ({ id: newId(), name: i.name, qty: i.qty || "", pending: false }));
+  }
+}
+function dataUrlToBlob(dataUrl) {
+  try {
+    const [head, b64] = dataUrl.split(",");
+    const mime = (head.match(/data:([^;]+)/) || [])[1] || "image/jpeg";
+    const bin = atob(b64);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return new Blob([bytes], { type: mime });
+  } catch (e) { return null; }
 }
 
 function guessMealType() {
@@ -387,7 +441,7 @@ const isResto = () => preparedBy.value === "Un resto";
 function renderPreparer() {
   const mode = preparedBy.value;
   preparerPicker.hidden = mode === "Moi";
-  if (mode === "Moi") { draft.preparer = ""; draft.preparerAddress = ""; return; }
+  if (mode === "Moi") { draft.preparer = ""; draft.preparerAddress = ""; renderNear(); return; }
   const list = preparerList();
   if (draft.preparer && !list.includes(draft.preparer)) draft.preparer = "";
   preparerChips.innerHTML =
@@ -396,6 +450,7 @@ function renderPreparer() {
   // Pour un resto, le champ de recherche est toujours visible
   if (isResto()) preparerAddRow.hidden = false;
   preparerNew.placeholder = isResto() ? "Rechercher un restaurant…" : "Prénom du proche";
+  renderNear();
   preparerNewOk.textContent = isResto() ? "Ajouter" : "Ajouter";
 }
 
@@ -486,6 +541,7 @@ preparerNew.setAttribute("aria-autocomplete", "list");
 async function initPlaces() {
   try { mcpApi = window.claude?.use ? await window.claude.use("mcp") : null; }
   catch (e) { mcpApi = null; }
+  renderNear();
 }
 
 const PLACE_ERRORS = {
@@ -531,7 +587,7 @@ async function searchPlaces(q) {
   } catch (e) {
     if (seq !== placeSeq) return;
     const code = e?.code || "upstream_error";
-    if (DURABLE.includes(code)) placeProblem = code;
+    if (DURABLE.includes(code)) { placeProblem = code; renderNear(); }
     lastRemote = { query: q, results: [], status: "error:" + code };
   }
   if (preparerNew.value.trim() === q) renderPlaceList();
@@ -546,9 +602,11 @@ function buildPlaceInput(q) {
   const input = { [qKey]: q };
   if (has("limit")) input.limit = 5;
   if (has("language")) input.language = "fr";
-  if (has("types") && mentions("types", '"poi"')) input.types = ["poi"];
+  if (has("types")) input.types = ["poi"];
   if (has("format") && mentions("format", "json_string")) input.format = "json_string";
   if (has("auto_complete")) input.auto_complete = true;
+  // Sans position, Mapbox se base sur l'emplacement de son serveur : on lui donne la ville choisie
+  if (nearPlace && (has("proximity") || !placeSchema)) input.proximity = { longitude: nearPlace.longitude, latitude: nearPlace.latitude };
   return input;
 }
 
@@ -641,6 +699,64 @@ placeBox.addEventListener("mousedown", e => {
   choosePlace(placeItems[Number(li.dataset.i)]);
 });
 placeBox.addEventListener("mousemove", e => { const li = e.target.closest("li[data-i]"); if (li) setPlaceActive(Number(li.dataset.i)); });
+
+// ---------- Ville de référence pour la recherche de restos ----------
+const nearRow = document.getElementById("nearRow");
+const nearLabel = document.getElementById("nearLabel");
+const nearBtn = document.getElementById("nearBtn");
+const nearEdit = document.getElementById("nearEdit");
+const nearInput = document.getElementById("nearInput");
+const nearStatus = document.getElementById("nearStatus");
+
+function renderNear() {
+  nearRow.hidden = !(isResto() && mcpApi && !placeProblem);
+  nearLabel.textContent = nearPlace ? `Résultats autour de ${nearPlace.name}` : "Choisis ta ville pour des résultats proches de toi";
+  nearBtn.textContent = nearPlace ? "changer" : "choisir";
+}
+nearBtn.addEventListener("click", () => {
+  nearEdit.hidden = false;
+  nearStatus.textContent = "";
+  nearInput.value = nearPlace?.name || "";
+  nearInput.focus();
+  nearInput.select();
+});
+async function saveNear() {
+  const q = nearInput.value.trim();
+  if (!q) { nearInput.focus(); return; }
+  nearStatus.textContent = "Recherche de la ville…";
+  try {
+    if (!placeTool) {
+      const res = await mcpApi.listTools(PLACES_SERVER);
+      const srv = res.servers.find(x => x.server === PLACES_SERVER);
+      if (!srv || !srv.tools.length) throw { code: "server_not_connected" };
+      placeTool = PLACE_TOOLS.find(n => srv.tools.some(t => t.name === n));
+      if (!placeTool) throw { code: "no_tool" };
+    }
+    const result = await mcpApi.callTool(PLACES_SERVER, placeTool, { q, types: ["place", "locality", "district"], language: "fr" });
+    let data = result?.payload;
+    if (typeof data === "string") { try { data = JSON.parse(data); } catch (e) { data = null; } }
+    const f = data?.features?.[0];
+    const coords = f?.geometry?.coordinates || (f?.properties?.coordinates && [f.properties.coordinates.longitude, f.properties.coordinates.latitude]);
+    if (!f || !Array.isArray(coords) || coords.length < 2) { nearStatus.textContent = "Ville introuvable, essaie un autre nom."; return; }
+    const p = f.properties || {};
+    nearPlace = { name: String(p.name || q).slice(0, 60), longitude: Number(coords[0]), latitude: Number(coords[1]) };
+    save(KEYS.near, nearPlace);
+    nearEdit.hidden = true;
+    lastRemote = { query: "", results: [], status: "" };
+    renderNear();
+    preparerNew.focus();
+    if (preparerNew.value.trim().length >= 3) onPlaceInput();
+  } catch (e) {
+    const code = e?.code || "upstream_error";
+    if (DURABLE.includes(code)) { placeProblem = code; renderNear(); }
+    nearStatus.textContent = PLACE_ERRORS[code] || "La ville n'a pas pu être cherchée pour le moment.";
+  }
+}
+document.getElementById("nearOk").addEventListener("click", saveNear);
+nearInput.addEventListener("keydown", e => {
+  if (e.key === "Enter") { e.preventDefault(); saveNear(); }
+  if (e.key === "Escape") { e.stopPropagation(); nearEdit.hidden = true; }
+});
 
 // ---------- Note sur 5 (demi-étoiles possibles) ----------
 function starsHtml(rating, cls = "") {
@@ -1234,7 +1350,7 @@ form.addEventListener("submit", e => {
 
   const type = form.type.value;
   const meal = {
-    id: `m-${Date.now()}`,
+    id: draft.editingId || `m-${Date.now()}`,
     name,
     date: form.date.value,
     type,
@@ -1253,8 +1369,10 @@ form.addEventListener("submit", e => {
     improve: form.improve.value.trim(),
     notes: form.notes.value.trim(),
   };
-  meals.push(meal);
-  if (!saveMeals()) { meals.pop(); return; }
+  const previous = meals.slice();
+  const idx = draft.editingId ? meals.findIndex(m => m.id === draft.editingId) : -1;
+  if (idx >= 0) meals[idx] = meal; else meals.push(meal);
+  if (!saveMeals()) { meals = previous; return; }
   const [yy, mm] = meal.date.split("-").map(Number);
   viewDate = new Date(yy, mm - 1, 1);
   goHome();
