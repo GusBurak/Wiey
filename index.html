@@ -201,6 +201,12 @@
             <div class="section-adder" id="sectionAdder">
               <button type="button" class="chip add-chip" id="addSectionBtn">+ Ajouter une sous-rubrique</button>
               <div class="section-choices" id="sectionChoices" hidden>
+                <div class="section-choices-head">
+                  <span class="hint">Choisis une sous-rubrique</span>
+                  <button type="button" class="remove-btn" id="sectionChooserClose" aria-label="Fermer">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+                  </button>
+                </div>
                 <div class="chip-list" id="sectionChips"></div>
                 <div class="add-inline" id="sectionOtherRow" hidden>
                   <input type="text" id="sectionOther" placeholder="Nom de la sous-rubrique" autocomplete="off">

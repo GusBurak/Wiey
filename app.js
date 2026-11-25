@@ -179,15 +179,9 @@ function showPreview(thumb) {
     <div class="preview-photo" style="background:${photoBg(meal)}">${photoHtml(meal)}</div>
     <div class="preview-info"><strong>${escapeHtml(meal.name)}</strong><span>${meal.type} · ${formatDate(meal.date)}${stars}</span></div>`;
 
-  const r = thumb.getBoundingClientRect();
-  const w = 260, h = preview.offsetHeight || 250, gap = 10;
-  let left = r.right + gap;
-  if (left + w > window.innerWidth - 8) left = r.left - w - gap;
-  if (left < 8) left = Math.min(Math.max(8, r.left), window.innerWidth - w - 8);
-  let top = r.top + r.height / 2 - h / 2;
-  top = Math.max(8, Math.min(top, window.innerHeight - h - 8));
-  preview.style.left = `${left}px`;
-  preview.style.top = `${top}px`;
+  // Aperçu centré à l'écran
+  preview.style.left = "50%";
+  preview.style.top = "50%";
   preview.classList.add("visible");
 }
 function hidePreview() { preview.classList.remove("visible"); }
@@ -328,9 +322,7 @@ function openAddPage() {
   document.querySelectorAll(".field-error").forEach(el => (el.hidden = true));
   renderPreparer();
   renderStars();
-  sectionChoices.hidden = true;
-  sectionOtherRow.hidden = true;
-  addSectionBtn.hidden = false;
+  closeSectionChooser();
   closeAutocomplete();
   renderIngredients();
   updateAnalyzeState();
@@ -550,6 +542,33 @@ function removeItem(itemId) {
   setTimeout(done, 160);
 }
 
+// Menu déroulant pour ranger un ingrédient dans une rubrique
+function rubricSelectHtml(item, section) {
+  const inMain = section === mainSection();
+  const subs = draft.sections.slice(1);
+  const used = new Set(subs.map(x => normalizeText(x.name)));
+  const fresh = SECTION_SUGGESTIONS.filter(n => !used.has(normalizeText(n)));
+  return `<select class="rubric-select empty" data-move="${item.id}" aria-label="Rubrique de ${escapeHtml(item.name)}">
+    ${inMain ? `<option value="" selected hidden>Ranger</option>` : `<option value="${mainSection().id}">Sans rubrique</option>`}
+    ${subs.map(x => `<option value="${x.id}"${x === section ? " selected" : ""}>${escapeHtml(x.name)}</option>`).join("")}
+    <optgroup label="Nouvelle rubrique">
+      ${fresh.map(n => `<option value="new:${escapeHtml(n)}">${escapeHtml(n)}</option>`).join("")}
+      <option value="other">Autre…</option>
+    </optgroup>
+  </select>`;
+}
+
+// Déplace un ingrédient validé vers une autre rubrique (à la suite des validés)
+function moveItem(itemId, targetSid) {
+  const found = findItem(itemId);
+  const target = draft.sections.find(x => x.id === targetSid);
+  if (!found || !target || found.section === target) return;
+  found.section.items.splice(found.index, 1);
+  const firstPending = target.items.findIndex(x => x.pending);
+  target.items.splice(firstPending < 0 ? target.items.length : firstPending, 0, found.item);
+  justAdded.add(found.item.id);
+}
+
 function renderIngredients(focusSectionId) {
   const showQty = qtyToggle.checked;
   ingSections.innerHTML = draft.sections.map((s, sIdx) => {
@@ -558,7 +577,12 @@ function renderIngredients(focusSectionId) {
     <div class="ing-section${sIdx ? " sub" : ""}" data-sid="${s.id}">
       ${sIdx ? `<div class="ing-section-head">
         <span class="ing-section-name">${escapeHtml(s.name)}</span>
-        <button type="button" class="remove-btn" data-remove-section="${s.id}" aria-label="Supprimer la sous-rubrique ${escapeHtml(s.name)}">${ICON_X}</button>
+        <span class="ing-section-actions">
+          ${s.open
+            ? `<button type="button" class="text-btn" data-close-section="${s.id}">${ICON_CHECK} Terminé</button>`
+            : `<button type="button" class="text-btn" data-open-section="${s.id}">+ Ajouter</button>`}
+          <button type="button" class="remove-btn" data-remove-section="${s.id}" aria-label="Supprimer la sous-rubrique ${escapeHtml(s.name)}">${ICON_X}</button>
+        </span>
       </div>` : ""}
       <ul class="ingredient-list">
         ${s.items.map(it => `
@@ -569,15 +593,17 @@ function renderIngredients(focusSectionId) {
             <button type="button" class="round-btn ok" data-accept="${it.id}" aria-label="Valider ${escapeHtml(it.name)}">${ICON_CHECK}</button>
             <button type="button" class="round-btn no" data-remove="${it.id}" aria-label="Retirer ${escapeHtml(it.name)}">${ICON_X}</button>`
           : `
+            ${rubricSelectHtml(it, s)}
             ${showQty ? `<input type="text" class="qty-input" data-qty="${it.id}" value="${escapeHtml(it.qty)}" placeholder="Ex. 200 g" aria-label="Quantité de ${escapeHtml(it.name)}">` : (it.qty ? `<span class="qty-text">${escapeHtml(it.qty)}</span>` : "")}
             <button type="button" class="round-btn no" data-remove="${it.id}" aria-label="Retirer ${escapeHtml(it.name)}">${ICON_X}</button>`}
         </li>`).join("")}
       </ul>
       ${pendingCount ? `<p class="hint">✨ ${pendingCount} suggestion${pendingCount > 1 ? "s" : ""} de l'analyse à valider (✓) ou retirer (✕). Celles non validées ne seront pas enregistrées.</p>` : ""}
-      <div class="add-inline ac-wrap">
+      ${sIdx && !s.open && !s.items.length ? `<p class="hint">Aucun ingrédient pour l'instant.</p>` : ""}
+      ${!sIdx || s.open ? `<div class="add-inline ac-wrap">
         <input type="text" class="ing-input" data-sid="${s.id}" placeholder="${sIdx ? `Ajouter dans « ${escapeHtml(s.name)} »…` : "Ajouter un ingrédient…"}" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false">
         <button type="button" class="small-btn" data-add-to="${s.id}">Ajouter</button>
-      </div>
+      </div>` : ""}
     </div>`;
   }).join("");
   justAdded.clear();
@@ -602,12 +628,41 @@ ingSections.addEventListener("click", e => {
   if (t.dataset.accept) { acceptItem(t.dataset.accept); renderIngredients(); }
   else if (t.dataset.remove) removeItem(t.dataset.remove);
   else if (t.dataset.addTo) submitTyped(ingSections.querySelector(`.ing-input[data-sid="${t.dataset.addTo}"]`));
+  else if (t.dataset.closeSection) {
+    // « Terminé » : ce qui est encore tapé est ajouté, puis le champ se referme
+    const input = ingSections.querySelector(`.ing-input[data-sid="${t.dataset.closeSection}"]`);
+    if (input?.value.trim()) input.value.split(",").forEach(v => addIngredient(t.dataset.closeSection, v));
+    draft.sections.find(x => x.id === t.dataset.closeSection).open = false;
+    closeAutocomplete();
+    renderIngredients();
+  }
+  else if (t.dataset.openSection) {
+    draft.sections.find(x => x.id === t.dataset.openSection).open = true;
+    renderIngredients(t.dataset.openSection);
+  }
   else if (t.dataset.removeSection) {
     const s = draft.sections.find(x => x.id === t.dataset.removeSection);
     if (s.items.some(x => !x.pending) && !confirm(`Supprimer « ${s.name} » et ses ingrédients ?`)) return;
     draft.sections = draft.sections.filter(x => x !== s);
     renderIngredients();
   }
+});
+ingSections.addEventListener("change", e => {
+  const sel = e.target.closest(".rubric-select");
+  if (!sel) return;
+  const v = sel.value;
+  if (v === "other") {
+    pendingMoveId = sel.dataset.move;
+    openSectionChooser(true);
+    renderIngredients(); // remet le menu dans son état tant que la rubrique n'est pas créée
+    sectionOther.focus();
+    return;
+  }
+  if (v.startsWith("new:")) {
+    const sec = createSection(v.slice(4), false);
+    moveItem(sel.dataset.move, sec.id);
+  } else moveItem(sel.dataset.move, v);
+  renderIngredients();
 });
 ingSections.addEventListener("input", e => {
   if (e.target.dataset.qty) { const f = findItem(e.target.dataset.qty); if (f) f.item.qty = e.target.value; }
@@ -708,21 +763,42 @@ function renderSectionChips() {
     .map(n => `<button type="button" class="chip" data-section-name="${escapeHtml(n)}">${escapeHtml(n)}</button>`).join("") +
     `<button type="button" class="chip add-chip" data-section-other>Autre…</button>`;
 }
-function addSection(name) {
+let pendingMoveId = null; // ingrédient à ranger dans la rubrique « Autre… » en cours de création
+
+function createSection(name, open) {
   name = capitalize(name.trim().slice(0, 40));
-  if (!name) return;
-  let section = draft.sections.find(s => normalizeText(s.name) === normalizeText(name));
-  if (!section) { section = { id: newId(), name, items: [] }; draft.sections.push(section); }
+  if (!name) return null;
+  let section = draft.sections.find(x => normalizeText(x.name) === normalizeText(name));
+  if (!section) { section = { id: newId(), name, items: [], open }; draft.sections.push(section); }
+  return section;
+}
+function addSection(name) {
+  const moving = pendingMoveId;
+  const section = createSection(name, !moving);
+  if (!section) { sectionOther.focus(); return; }
+  if (moving) moveItem(moving, section.id);
+  else {
+    // Une seule sous-rubrique ouverte à la fois pour garder la page lisible
+    draft.sections.slice(1).forEach(x => (x.open = x === section));
+  }
+  closeSectionChooser();
+  renderIngredients(moving ? null : section.id);
+}
+function openSectionChooser(otherInput) {
+  sectionChoices.hidden = false;
+  addSectionBtn.hidden = true;
+  sectionOtherRow.hidden = !otherInput;
+  if (otherInput) sectionOther.value = "";
+  renderSectionChips();
+}
+function closeSectionChooser() {
   sectionChoices.hidden = true;
   sectionOtherRow.hidden = true;
   addSectionBtn.hidden = false;
-  renderIngredients(section.id);
+  pendingMoveId = null;
 }
-addSectionBtn.addEventListener("click", () => {
-  sectionChoices.hidden = false;
-  addSectionBtn.hidden = true;
-  renderSectionChips();
-});
+addSectionBtn.addEventListener("click", () => openSectionChooser(false));
+document.getElementById("sectionChooserClose").addEventListener("click", closeSectionChooser);
 sectionChips.addEventListener("click", e => {
   const chip = e.target.closest(".chip");
   if (!chip) return;
@@ -735,7 +811,7 @@ sectionChips.addEventListener("click", e => {
 document.getElementById("sectionOtherOk").addEventListener("click", () => addSection(sectionOther.value));
 sectionOther.addEventListener("keydown", e => {
   if (e.key === "Enter") { e.preventDefault(); addSection(sectionOther.value); }
-  if (e.key === "Escape") { e.stopPropagation(); sectionChoices.hidden = true; addSectionBtn.hidden = false; }
+  if (e.key === "Escape") { e.stopPropagation(); closeSectionChooser(); }
 });
 
 // ---------- Analyse de la photo par Claude ----------

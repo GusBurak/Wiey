@@ -214,15 +214,15 @@ h1, h2 { font-family: Fraunces, Georgia, serif; font-weight: 500; margin: 0; }
 /* Aperçu au survol */
 .hover-preview {
   position: fixed; z-index: 50; pointer-events: none;
-  width: 260px; background: var(--surface);
+  width: min(380px, calc(100vw - 32px)); background: var(--surface);
   border: 1px solid var(--border); border-radius: 14px;
   box-shadow: 0 12px 40px rgba(0, 0, 0, .18);
   overflow: hidden;
-  opacity: 0; transform: translateY(4px);
-  transition: opacity .12s ease, transform .12s ease;
+  opacity: 0; transform: translate(-50%, -50%) scale(.96);
+  transition: opacity .14s ease, transform .14s ease;
 }
-.hover-preview.visible { opacity: 1; transform: none; }
-.preview-photo { height: 190px; display: grid; place-items: center; font-size: 84px; }
+.hover-preview.visible { opacity: 1; transform: translate(-50%, -50%); }
+.preview-photo { height: 280px; display: grid; place-items: center; font-size: 120px; }
 .preview-photo img { width: 100%; height: 100%; object-fit: cover; }
 .preview-info { padding: 10px 12px 12px; }
 .preview-info strong { display: block; font-size: 14px; }
@@ -489,6 +489,29 @@ h1, h2 { font-family: Fraunces, Georgia, serif; font-weight: 500; margin: 0; }
 
 .section-adder { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
 .section-adder .chip[hidden], .section-choices[hidden] { display: none; }
+.section-choices-head { display: flex; align-items: center; justify-content: space-between; }
+.ing-section-actions { display: flex; align-items: center; gap: 4px; }
+.text-btn {
+  display: inline-flex; align-items: center; gap: 5px; border: none; background: none;
+  font-size: 12px; font-weight: 600; color: var(--accent); padding: 5px 8px; border-radius: 8px;
+}
+.text-btn svg { width: 13px; height: 13px; stroke-width: 2.6; }
+.text-btn:hover { background: var(--accent-soft); }
+
+/* Menu « Ranger dans… » */
+.add-form select.rubric-select {
+  width: auto; max-width: 150px; flex-shrink: 0; appearance: none; cursor: pointer;
+  font-size: 12px; font-weight: 500; padding: 4px 24px 4px 10px; border-radius: 999px;
+  background: var(--accent-soft) no-repeat right 8px center / 11px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23c96442' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  color: var(--accent); border-color: transparent; text-overflow: ellipsis;
+}
+.add-form select.rubric-select.empty {
+  background-color: transparent; color: var(--muted); border: 1px dashed var(--border);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2375716a' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+}
+.ingredient:not(:hover):not(:focus-within) .rubric-select.empty { opacity: .55; }
+
 .section-choices { display: flex; flex-direction: column; gap: 8px; width: 100%; }
 
 .form-actions {
@@ -527,7 +550,8 @@ h1, h2 { font-family: Fraunces, Georgia, serif; font-weight: 500; margin: 0; }
   .add-header h1 { font-size: 25px; }
   .field-row { flex-direction: column; }
   .photo-drop { height: 200px; }
-  .add-form input.qty-input { width: 90px; }
+  .add-form input.qty-input { width: 80px; }
+  .add-form select.rubric-select { max-width: 120px; }
   .form-actions { bottom: 0; }
   .card { min-height: auto; }
   .bottom-row { grid-template-columns: 1fr; gap: 12px; }
