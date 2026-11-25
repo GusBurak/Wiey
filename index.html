@@ -275,6 +275,20 @@
     </div>
   </div>
 
+  <!-- Confirmation (remplace la fenêtre du navigateur, bloquée dans certaines pages) -->
+  <div class="modal-backdrop confirm-backdrop" id="confirmModal" hidden>
+    <div class="modal confirm-box" role="alertdialog" aria-modal="true" aria-labelledby="confirmText">
+      <p id="confirmText"></p>
+      <div class="confirm-actions">
+        <button type="button" class="ghost-btn" id="confirmCancel">Annuler</button>
+        <button type="button" class="danger-solid-btn" id="confirmOk">Supprimer</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Petit message temporaire -->
+  <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
   <script src="ingredients.js"></script>
   <script src="app.js"></script>
 </body>

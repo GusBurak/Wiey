@@ -588,6 +588,23 @@ h1, h2 { font-family: Fraunces, Georgia, serif; font-weight: 500; margin: 0; }
 
 .section-choices { display: flex; flex-direction: column; gap: 8px; width: 100%; }
 
+/* Confirmation et message temporaire */
+.confirm-backdrop { z-index: 200; }
+.confirm-box { width: min(380px, 100%); padding: 20px; }
+.confirm-box p { margin: 0 0 18px; line-height: 1.5; font-size: 15px; }
+.confirm-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.danger-solid-btn {
+  border: none; border-radius: 9px; padding: 0 14px; height: 34px;
+  background: #b3412e; color: #fff; font-weight: 600; font-size: 13px;
+}
+.danger-solid-btn:hover { filter: brightness(1.08); }
+.toast {
+  position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 300;
+  background: var(--text); color: var(--bg); padding: 10px 16px; border-radius: 10px;
+  font-size: 13px; box-shadow: 0 8px 24px rgba(0, 0, 0, .2); max-width: calc(100vw - 32px);
+}
+.toast[hidden] { display: none; }
+
 .form-actions {
   position: sticky; bottom: -20px; z-index: 5;
   display: flex; justify-content: flex-end; gap: 10px;

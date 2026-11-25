@@ -17,9 +17,47 @@ function load(key, fallback) {
   } catch (e) { /* stockage indisponible */ }
   return fallback();
 }
+// ---------- Confirmation et messages intégrés à la page ----------
+// (les fenêtres confirm()/alert() du navigateur sont bloquées dans la version publiée)
+function askConfirm(message, okLabel = "Supprimer") {
+  const modal = document.getElementById("confirmModal");
+  const ok = document.getElementById("confirmOk");
+  const cancel = document.getElementById("confirmCancel");
+  document.getElementById("confirmText").textContent = message;
+  ok.textContent = okLabel;
+  modal.hidden = false;
+  ok.focus();
+  return new Promise(resolve => {
+    const done = value => {
+      modal.hidden = true;
+      ok.removeEventListener("click", onOk);
+      cancel.removeEventListener("click", onCancel);
+      modal.removeEventListener("click", onBackdrop);
+      document.removeEventListener("keydown", onKey, true);
+      resolve(value);
+    };
+    const onOk = () => done(true);
+    const onCancel = () => done(false);
+    const onBackdrop = e => { if (e.target === modal) done(false); };
+    const onKey = e => { if (e.key === "Escape") { e.stopPropagation(); done(false); } };
+    ok.addEventListener("click", onOk);
+    cancel.addEventListener("click", onCancel);
+    modal.addEventListener("click", onBackdrop);
+    document.addEventListener("keydown", onKey, true);
+  });
+}
+let toastTimer = null;
+function notify(message) {
+  const t = document.getElementById("toast");
+  t.textContent = message;
+  t.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => (t.hidden = true), 3500);
+}
+
 function save(key, value) {
   try { localStorage.setItem(key, JSON.stringify(value)); return true; }
-  catch (e) { alert("Impossible d'enregistrer (stockage du navigateur plein ?)."); return false; }
+  catch (e) { notify("Impossible d'enregistrer : le stockage du navigateur est peut-être plein."); return false; }
 }
 
 let meals = load(KEYS.meals, () => []);
@@ -222,14 +260,17 @@ function openDetail(id) {
   detailModal.hidden = false;
 }
 
-detailContent.addEventListener("click", e => {
+detailContent.addEventListener("click", async e => {
   if (e.target.dataset.edit) { location.hash = "modifier/" + encodeURIComponent(e.target.dataset.edit); return; }
   const id = e.target.dataset.delete;
-  if (!id || !confirm("Supprimer ce repas ?")) return;
+  if (!id) return;
+  const meal = meals.find(x => x.id === id);
+  if (!await askConfirm(`Supprimer « ${meal ? meal.name : "ce repas"} » du calendrier ?`, "Supprimer le repas")) return;
   meals = meals.filter(x => x.id !== id);
   saveMeals();
   closeModals();
   refresh();
+  notify("Repas supprimé.");
 });
 
 // Ingrédients regroupés : liste principale puis sous-rubriques
@@ -403,7 +444,7 @@ photoInput.addEventListener("change", () => {
     draft.sections.forEach(sec => (sec.items = sec.items.filter(x => !x.pending)));
     renderIngredients();
   };
-  img.onerror = () => alert("Cette image n'a pas pu être lue.");
+  img.onerror = () => notify("Cette image n'a pas pu être lue.");
   img.src = URL.createObjectURL(file);
 });
 
@@ -1037,7 +1078,7 @@ function commitRename(input, keep) {
   const name = capitalize(input.value.trim().slice(0, 40));
   if (keep && s && name && name !== s.name) {
     const clash = draft.sections.find(x => x !== s && normalizeText(x.name) === normalizeText(name));
-    if (clash) alert(`Une sous-rubrique « ${clash.name} » existe déjà.`);
+    if (clash) notify(`Une sous-rubrique « ${clash.name} » existe déjà.`);
     else { s.name = name; flashIds.add(s.id); }
   }
   renderIngredients();
@@ -1061,7 +1102,7 @@ function submitTyped(input, pickedName) {
   renderIngredients(sid);
 }
 
-ingSections.addEventListener("click", e => {
+ingSections.addEventListener("click", async e => {
   const t = e.target.closest("button");
   if (!t) return;
   if (t.dataset.accept) { acceptItem(t.dataset.accept); renderIngredients(); }
@@ -1100,7 +1141,7 @@ ingSections.addEventListener("click", e => {
   }
   else if (t.dataset.removeSection) {
     const s = draft.sections.find(x => x.id === t.dataset.removeSection);
-    if (s.items.some(x => !x.pending) && !confirm(`Supprimer « ${s.name} » et ses ingrédients ?`)) return;
+    if (s.items.some(x => !x.pending) && !await askConfirm(`Supprimer la sous-rubrique « ${s.name} » et ses ingrédients ?`)) return;
     draft.sections = draft.sections.filter(x => x !== s);
     renderIngredients();
   }
