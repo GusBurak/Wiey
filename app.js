@@ -474,14 +474,23 @@ function renderPreparer() {
   if (mode === "Moi") { draft.preparer = ""; draft.preparerAddress = ""; renderNear(); return; }
   const list = preparerList();
   if (draft.preparer && !list.includes(draft.preparer)) draft.preparer = "";
+  // Livraison : un seul resto. Une fois choisi, il s'affiche seul avec une croix pour le changer.
+  if (isDelivery()) {
+    preparerChips.innerHTML = draft.preparer
+      ? `<span class="chip selected-chip">${escapeHtml(draft.preparer)}<button type="button" class="chip-x" data-clear aria-label="Changer de resto">${ICON_X}</button></span>`
+      : "";
+    preparerAddRow.hidden = !!draft.preparer;
+    preparerNew.placeholder = "Nom du resto qui a livré";
+    renderNear();
+    return;
+  }
   preparerChips.innerHTML =
     list.map(n => `<button type="button" class="chip" role="radio" aria-checked="${n === draft.preparer}" data-name="${escapeHtml(n)}">${escapeHtml(n)}</button>`).join("") +
-    (isResto() ? "" : `<button type="button" class="chip add-chip" data-add>+ ${isDelivery() ? "Ajouter un resto" : "Ajouter un proche"}</button>`);
+    (isResto() ? "" : `<button type="button" class="chip add-chip" data-add>+ Ajouter un proche</button>`);
   // Pour un resto, le champ de recherche est toujours visible
   if (isResto()) preparerAddRow.hidden = false;
-  preparerNew.placeholder = isResto() ? "Rechercher un restaurant…" : isDelivery() ? "Nom du resto qui a livré" : "Prénom du proche";
+  preparerNew.placeholder = isResto() ? "Rechercher un restaurant…" : "Prénom du proche";
   renderNear();
-  preparerNewOk.textContent = isResto() ? "Ajouter" : "Ajouter";
 }
 
 preparedBy.addEventListener("change", () => {
@@ -491,13 +500,15 @@ preparedBy.addEventListener("change", () => {
   closePlaceList();
   renderPreparer();
   // Pas encore de proche enregistré, ou mode resto : on ouvre directement la saisie
-  if (preparedBy.value !== "Moi" && (isResto() || !preparerList().length)) showPreparerInput();
+  if (preparedBy.value !== "Moi" && (isResto() || isDelivery() || !preparerList().length)) showPreparerInput();
 });
 
 preparerChips.addEventListener("click", e => {
   const chip = e.target.closest(".chip");
   if (!chip) return;
   if (chip.hasAttribute("data-add")) { showPreparerInput(); return; }
+  if (e.target.closest("[data-clear]")) { draft.preparer = ""; renderPreparer(); showPreparerInput(); return; }
+  if (!chip.dataset.name) return;
   draft.preparer = draft.preparer === chip.dataset.name ? "" : chip.dataset.name;
   draft.preparerAddress = draft.preparer ? (restaurantInfo[draft.preparer] || "") : "";
   renderPreparer();

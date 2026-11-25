@@ -385,6 +385,16 @@ h1, h2 { font-family: Fraunces, Georgia, serif; font-weight: 500; margin: 0; }
 }
 .chip:hover { background: var(--hover); }
 .chip[aria-checked="true"] { background: var(--text); color: var(--bg); border-color: var(--text); }
+.chip.selected-chip {
+  display: inline-flex; align-items: center; gap: 4px; padding-right: 4px;
+  background: var(--text); color: var(--bg); border-color: var(--text);
+}
+.chip-x {
+  width: 20px; height: 20px; border: none; border-radius: 50%; padding: 0;
+  display: grid; place-items: center; background: transparent; color: inherit; opacity: .75;
+}
+.chip-x:hover { opacity: 1; background: rgba(255, 255, 255, .15); }
+.chip-x svg { width: 12px; height: 12px; stroke-width: 2.4; }
 .chip.add-chip { border-style: dashed; color: var(--muted); }
 .add-inline { display: flex; gap: 8px; }
 .add-inline[hidden] { display: none; }
