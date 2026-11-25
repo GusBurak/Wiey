@@ -5,7 +5,6 @@
 
 const KEYS = { meals: "wiey.meals", people: "wiey.people", restaurants: "wiey.restaurants", restaurantInfo: "wiey.restaurantInfo", near: "wiey.near", deliveries: "wiey.deliveries" };
 const MEAL_TYPES = ["Petit-déjeuner", "Déjeuner", "Goûter", "Dîner"];
-const TYPE_EMOJI = { "Petit-déjeuner": "🥐", "Déjeuner": "🥗", "Goûter": "🍎", "Dîner": "🍝" };
 const COURSES = ["Apéritif", "Entrée", "Plat", "Dessert"];
 const COURSE_MEALS = ["Déjeuner", "Dîner"]; // repas pour lesquels on précise le moment
 const RATING_LABELS = ["", "Bof", "Moyen", "Bon", "Très bon", "Excellent"];
@@ -62,34 +61,9 @@ function photoHtml(meal) {
   return escapeHtml(guessEmoji(meal));
 }
 
-// Sans photo : un emoji choisi d'après le nom du plat, puis les ingrédients, puis le moment du repas
-const EMOJI_RULES = [
-  [/pizza/, "🍕"], [/burger|hamburger/, "🍔"], [/sushi|maki|sashimi|california/, "🍣"],
-  [/ramen|\bpho\b|nouille|udon|soba/, "🍜"], [/spaghetti|pates|lasagne|tagliatelle|penne|carbonara|bolognaise|gnocchi|ravioli/, "🍝"],
-  [/curry|\bdal\b|tikka|masala/, "🍛"], [/taco|burrito|fajita|quesadilla|nachos/, "🌮"], [/kebab|shawarma|wrap|pita/, "🥙"],
-  [/hot ?dog/, "🌭"], [/sandwich|panini|croque|club/, "🥪"], [/bagel/, "🥯"], [/falafel/, "🧆"],
-  [/ravioli chinois|dim sum|gyoza|dumpling|\bbao\b/, "🥟"], [/soupe|veloute|potage|bouillon|pot-au-feu|minestrone/, "🍲"],
-  [/salade|bowl|poke|buddha/, "🥗"], [/crepe|galette|pancake|gaufre/, "🥞"], [/croissant|viennoiserie|pain au chocolat/, "🥐"],
-  [/quiche|tourte|feuillete/, "🥧"], [/frite/, "🍟"], [/omelette|oeuf/, "🍳"], [/riz|risotto|paella/, "🍚"],
-  [/crevette|gambas|scampi/, "🍤"], [/poisson|saumon|thon|cabillaud|\bbar\b|dorade|truite|sardine|moule|fruits de mer/, "🐟"],
-  [/barbecue|bbq|merguez|saucisse|grillade|brochette|ribs|chipolata/, "🍖"],
-  [/poulet|dinde|canard|volaille|nugget/, "🍗"], [/steak|boeuf|entrecote|bavette|agneau|veau|porc|cote|roti|viande/, "🥩"],
-  [/fromage|raclette|fondue|tartiflette|camembert/, "🧀"], [/glace|sorbet/, "🍨"], [/cookie|biscuit/, "🍪"],
-  [/chocolat|brownie|fondant/, "🍫"], [/gateau|tarte|cheesecake|tiramisu|patisserie|clafoutis|eclair|cake|dessert|flan|mousse/, "🍰"],
-  [/yaourt|granola|muesli|porridge|cereale|skyr/, "🥣"], [/tartine|toast|pain|baguette/, "🍞"],
-  [/avocat|guacamole/, "🥑"], [/banane/, "🍌"], [/pomme de terre|patate|puree/, "🥔"], [/pomme|poire/, "🍎"], [/fraise|framboise|fruits rouges|myrtille/, "🍓"],
-  [/orange|clementine|agrume/, "🍊"], [/fruit/, "🍇"], [/legume|brocoli|courgette|ratatouille|haricot|epinard/, "🥦"],
-  [/cafe|cappuccino|latte/, "☕"], [/\bthe\b|tisane|infusion/, "🍵"], [/smoothie|jus/, "🥤"], [/\bvin\b|champagne|apero|cocktail/, "🥂"], [/biere/, "🍺"],
-];
-const COURSE_EMOJI = { "Apéritif": "🥂", "Entrée": "🥗", "Dessert": "🍰" };
+// Sans photo : un emoji selon le repas
 const DEFAULT_EMOJI = { "Petit-déjeuner": "🥐", "Déjeuner": "🍽️", "Goûter": "🍪", "Dîner": "🍽️" };
-function guessEmoji(meal) {
-  const find = text => { const n = normalizeText(text || ""); const r = EMOJI_RULES.find(([re]) => re.test(n)); return r && r[1]; };
-  return find(meal.name)
-    || (meal.ingredients || []).map(i => find(i.name)).find(Boolean)
-    || COURSE_EMOJI[meal.course]
-    || DEFAULT_EMOJI[meal.type] || "🍽️";
-}
+function guessEmoji(meal) { return DEFAULT_EMOJI[meal.type] || "🍽️"; }
 function photoBg(meal) {
   return meal.photo ? "transparent" : (meal.color || "var(--accent-soft)");
 }
