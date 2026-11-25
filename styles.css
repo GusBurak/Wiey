@@ -532,7 +532,7 @@ h1, h2 { font-family: Fraunces, Georgia, serif; font-weight: 500; margin: 0; }
 .link-inline { border: none; background: none; padding: 0; color: var(--accent); font: inherit; text-decoration: underline; cursor: pointer; }
 
 .section-adder { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
-.section-adder .chip[hidden], .section-choices[hidden] { display: none; }
+.section-adder .chip[hidden], .section-choices[hidden], #sectionSuggestHint[hidden] { display: none; }
 /* Sous-rubrique ouverte à sa place dans la liste */
 .ing-section.sub-editor {
   list-style: none; margin: 4px 0; padding: 10px 12px 12px;

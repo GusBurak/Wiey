@@ -981,8 +981,8 @@ function rubricSelectHtml(item, section) {
     ${inMain ? `<option value="" selected hidden>Ranger</option>` : `<option value="${mainSection().id}">Sans rubrique</option>`}
     ${subs.map(x => `<option value="${x.id}"${x === section ? " selected" : ""}>${escapeHtml(x.name)}</option>`).join("")}
     <optgroup label="Nouvelle rubrique">
+      <option value="other">Nommer une rubrique…</option>
       ${fresh.map(n => `<option value="new:${escapeHtml(n)}">${escapeHtml(n)}</option>`).join("")}
-      <option value="other">Autre…</option>
     </optgroup>
   </select>`;
 }
@@ -1184,7 +1184,7 @@ ingSections.addEventListener("change", e => {
   const v = sel.value;
   if (v === "other") {
     pendingMoveId = sel.dataset.move;
-    openSectionChooser(true);
+    openSectionChooser();
     renderIngredients(); // remet le menu dans son état tant que la rubrique n'est pas créée
     sectionOther.focus();
     return;
@@ -1291,8 +1291,8 @@ acBox.addEventListener("mousemove", e => { const li = e.target.closest("li"); if
 function renderSectionChips() {
   const used = new Set(draft.sections.map(s => normalizeText(s.name)));
   sectionChips.innerHTML = SECTION_SUGGESTIONS.filter(n => !used.has(normalizeText(n)))
-    .map(n => `<button type="button" class="chip" data-section-name="${escapeHtml(n)}">${escapeHtml(n)}</button>`).join("") +
-    `<button type="button" class="chip add-chip" data-section-other>Autre…</button>`;
+    .map(n => `<button type="button" class="chip" data-section-name="${escapeHtml(n)}">${escapeHtml(n)}</button>`).join("");
+  document.getElementById("sectionSuggestHint").hidden = !sectionChips.children.length;
 }
 let pendingMoveId = null; // ingrédient à ranger dans la rubrique « Autre… » en cours de création
 
@@ -1315,29 +1315,25 @@ function addSection(name) {
   closeSectionChooser();
   renderIngredients(moving ? null : section.id);
 }
-function openSectionChooser(otherInput) {
+// Le nom libre est le choix principal ; les noms proposés ne sont que des suggestions
+function openSectionChooser() {
   sectionChoices.hidden = false;
   addSectionBtn.hidden = true;
-  sectionOtherRow.hidden = !otherInput;
-  if (otherInput) sectionOther.value = "";
+  sectionOther.value = "";
   renderSectionChips();
+  sectionOther.focus();
 }
 function closeSectionChooser() {
   sectionChoices.hidden = true;
-  sectionOtherRow.hidden = true;
   addSectionBtn.hidden = false;
   pendingMoveId = null;
 }
-addSectionBtn.addEventListener("click", () => openSectionChooser(false));
+addSectionBtn.addEventListener("click", () => openSectionChooser());
 document.getElementById("sectionChooserClose").addEventListener("click", closeSectionChooser);
 sectionChips.addEventListener("click", e => {
   const chip = e.target.closest(".chip");
   if (!chip) return;
-  if (chip.hasAttribute("data-section-other")) {
-    sectionOtherRow.hidden = false;
-    sectionOther.value = "";
-    sectionOther.focus();
-  } else addSection(chip.dataset.sectionName);
+  addSection(chip.dataset.sectionName);
 });
 document.getElementById("sectionOtherOk").addEventListener("click", () => addSection(sectionOther.value));
 sectionOther.addEventListener("keydown", e => {
