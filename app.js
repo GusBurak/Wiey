@@ -133,12 +133,14 @@ function route() {
   const editMatch = location.hash.match(/^#modifier\/(.+)$/);
   const editMeal = editMatch && meals.find(m => m.id === decodeURIComponent(editMatch[1]));
   if (editMatch && !editMeal) { goHome(); return; }
-  const adding = location.hash === "#ajouter" || !!editMeal;
+  // #ajouter/AAAA-MM-JJ = nouveau repas à une date précise (bouton + d'une case du calendrier)
+  const addMatch = location.hash.match(/^#ajouter(?:\/(\d{4}-\d{2}-\d{2}))?$/);
+  const adding = !!addMatch || !!editMeal;
   homeView.hidden = adding;
   addView.hidden = !adding;
   document.querySelector(".menu-item").classList.toggle("active", !adding);
   closeModals();
-  if (adding) openAddPage(editMeal || null);
+  if (adding) openAddPage(editMeal || null, addMatch && addMatch[1]);
   else refresh();
   document.querySelector(".content").scrollTop = 0;
   sidebar.classList.remove("open");
@@ -188,7 +190,10 @@ function renderCalendar() {
     if (dateIso === todayIso) classes.push("today");
     if (cell % 7 >= 5) classes.push("weekend");
     html += `<div class="${classes.join(" ")}">
-      <span class="day-num">${dayNum}</span>
+      <div class="day-head">
+        <span class="day-num">${dayNum}</span>
+        <button type="button" class="day-add" data-add-date="${dateIso}" aria-label="Ajouter un repas le ${formatDate(dateIso)}" title="Ajouter un repas ce jour-là">+</button>
+      </div>
       <div class="thumbs">
         ${dayMeals.map(meal => `
           <button class="thumb" data-id="${escapeHtml(meal.id)}" style="background:${photoBg(meal)}" aria-label="${escapeHtml(mealMoment(meal) + " : " + meal.name)}">
@@ -226,6 +231,8 @@ function hidePreview() { preview.classList.remove("visible"); }
 grid.addEventListener("mouseover", e => { const t = e.target.closest(".thumb"); if (t) showPreview(t); });
 grid.addEventListener("mouseout", e => { if (e.target.closest(".thumb") && !e.relatedTarget?.closest?.(".thumb")) hidePreview(); });
 grid.addEventListener("click", e => {
+  const add = e.target.closest("[data-add-date]");
+  if (add) { location.hash = "ajouter/" + add.dataset.addDate; return; }
   const t = e.target.closest(".thumb");
   if (t) { hidePreview(); openDetail(t.dataset.id); }
 });
@@ -356,13 +363,13 @@ function resetDraft() {
   draft = { photo: null, photoBlob: null, preparer: "", rating: 0, sections: [{ id: newId(), name: "", items: [] }], course: "Plat", preparerAddress: "" };
 }
 
-function openAddPage(meal) {
+function openAddPage(meal, presetDate) {
   resetDraft();
   form.reset();
   draft.editingId = meal ? meal.id : null;
   document.getElementById("addTitle").textContent = meal ? "Modifier le repas" : "Ajouter un repas";
   document.getElementById("submitBtn").textContent = meal ? "Enregistrer les modifications" : "Enregistrer le repas";
-  form.date.value = meal ? meal.date : iso(new Date());
+  form.date.value = meal ? meal.date : (presetDate || iso(new Date()));
   form.type.value = meal ? meal.type : "Déjeuner"; // Déjeuner par défaut pour un nouveau repas
   if (meal) fillDraftFromMeal(meal);
   renderCourse();
