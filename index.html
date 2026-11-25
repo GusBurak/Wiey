@@ -91,12 +91,15 @@
           </div>
         </section>
 
-        <section class="card action-card idea-card">
-          <div class="idea-head">
-            <h2>Qu'est-ce qu'on mange&nbsp;?</h2>
-            <button class="ghost-btn" id="nextIdea">Autre idée ↻</button>
+        <section class="card action-card idea-card coming-soon" aria-label="Qu'est-ce qu'on mange ? Bientôt disponible">
+          <div class="idea-inner" aria-hidden="true" inert>
+            <div class="idea-head">
+              <h2>Qu'est-ce qu'on mange&nbsp;?</h2>
+              <button class="ghost-btn" id="nextIdea" tabindex="-1">Autre idée ↻</button>
+            </div>
+            <div class="idea-body" id="ideaBody"></div>
           </div>
-          <div class="idea-body" id="ideaBody"></div>
+          <span class="soon-badge">Bientôt disponible</span>
         </section>
       </div>
       </div>
