@@ -21,43 +21,25 @@ function save(key, value) {
   catch (e) { alert("Impossible d'enregistrer (stockage du navigateur plein ?)."); return false; }
 }
 
-// Quelques repas d'exemple pour que le calendrier ne soit pas vide au premier lancement
-function demoMeals() {
-  const now = new Date();
-  const y = now.getFullYear(), m = now.getMonth(), today = now.getDate();
-  const samples = [
-    { name: "Tartines beurre & confiture", type: "Petit-déjeuner", emoji: "🍞", color: "#f6e3c4", ingredients: ["Pain de campagne", "Beurre", "Confiture d'abricot"], preparedBy: "Moi", rating: 3 },
-    { name: "Bowl saumon avocat", type: "Déjeuner", emoji: "🍣", color: "#fbd9cf", ingredients: ["Riz vinaigré", "Saumon", "Avocat", "Edamame", "Sésame"], preparedBy: "Un resto", preparer: "Sushi Shop", rating: 4 },
-    { name: "Pâtes au pesto", type: "Dîner", emoji: "🍝", color: "#dfeccd", ingredients: ["Pâtes", "Basilic", "Parmesan", "Pignons", "Huile d'olive"], preparedBy: "Moi", rating: 4, improve: "Faire griller les pignons avant." },
-    { name: "Salade grecque", type: "Déjeuner", emoji: "🥗", color: "#d9eedb", ingredients: ["Tomates", "Concombre", "Feta", "Olives", "Oignon rouge"], preparedBy: "Moi", rating: 3 },
-    { name: "Pizza margherita", type: "Dîner", emoji: "🍕", color: "#f9d5c3", ingredients: ["Pâte à pizza", "Sauce tomate", "Mozzarella", "Basilic"], preparedBy: "Un resto", preparer: "Chez Gino", rating: 5 },
-    { name: "Yaourt & granola", type: "Petit-déjeuner", emoji: "🥣", color: "#eee6f6", ingredients: ["Yaourt grec", "Granola", "Fruits rouges", "Miel"], preparedBy: "Moi", rating: 4 },
-    { name: "Burger maison", type: "Dîner", emoji: "🍔", color: "#f3dcc0", ingredients: ["Pain burger", "Bœuf haché", "Cheddar", "Oignons confits"], preparedBy: "Un proche", preparer: "Léa", rating: 5 },
-    { name: "Pomme & amandes", type: "Goûter", emoji: "🍎", color: "#f8d4d4", ingredients: ["Pomme", "Amandes"], preparedBy: "Moi", rating: 3 },
-    { name: "Curry de pois chiches", type: "Déjeuner", emoji: "🍛", color: "#f7e2b5", ingredients: ["Pois chiches", "Lait de coco", "Épinards", "Riz basmati", "Curry"], preparedBy: "Moi", rating: 4, improve: "Un peu plus épicé." },
-    { name: "Soupe de légumes", type: "Dîner", emoji: "🍲", color: "#e5ecd2", ingredients: ["Poireaux", "Carottes", "Pommes de terre"], preparedBy: "Un proche", preparer: "Maman", rating: 4 },
-    { name: "Crêpes", type: "Goûter", emoji: "🥞", color: "#f6e7c9", ingredients: ["Farine", "Œufs", "Lait", "Sucre", "Citron"], preparedBy: "Moi", rating: 5 },
-    { name: "Tacos poulet", type: "Déjeuner", emoji: "🌮", color: "#f9e0c2", ingredients: ["Tortillas", "Poulet", "Guacamole", "Salsa"], preparedBy: "Un resto", preparer: "El Taco", rating: 3 },
-  ];
-  const list = [];
-  let i = 0;
-  for (let d = 1; d <= today; d++) {
-    const count = (d * 7) % 4; // 0 à 3 repas par jour, de façon déterministe
-    for (let k = 0; k < count; k++) {
-      const s = samples[(i++ * 5) % samples.length];
-      list.push({
-        id: `demo-${d}-${k}`, date: iso(new Date(y, m, d)), photo: null, preparer: "", improve: "", recipeUrl: "",
-        ...s, ingredients: s.ingredients.map(name => ({ name, qty: "" })),
-      });
-    }
-  }
-  return list;
-}
-
-let meals = load(KEYS.meals, demoMeals);
-let people = load(KEYS.people, () => ["Léa", "Maman"]);
-let restaurants = load(KEYS.restaurants, () => ["Chez Gino", "Sushi Shop", "El Taco"]);
+let meals = load(KEYS.meals, () => []);
+let people = load(KEYS.people, () => []);
+let restaurants = load(KEYS.restaurants, () => []);
 const saveMeals = () => save(KEYS.meals, meals);
+
+// Nettoyage unique : retire les repas d'exemple (identifiants « demo-… ») et les
+// proches / restaurants fictifs qui allaient avec, sauf s'ils servent à un vrai repas.
+(function removeDemoData() {
+  const DEMO_PEOPLE = ["Léa", "Maman"];
+  const DEMO_RESTAURANTS = ["Chez Gino", "Sushi Shop", "El Taco"];
+  const before = meals.length;
+  meals = meals.filter(m => !String(m.id).startsWith("demo-"));
+  const used = new Set(meals.map(m => m.preparer).filter(Boolean));
+  const p = people.filter(n => !DEMO_PEOPLE.includes(n) || used.has(n));
+  const r = restaurants.filter(n => !DEMO_RESTAURANTS.includes(n) || used.has(n));
+  if (meals.length !== before) saveMeals();
+  if (p.length !== people.length) { people = p; save(KEYS.people, people); }
+  if (r.length !== restaurants.length) { restaurants = r; save(KEYS.restaurants, restaurants); }
+})();
 
 // ---------- Utilitaires ----------
 function iso(d) {
@@ -617,34 +599,10 @@ function groupRowHtml(s) {
     </li>`;
 }
 
-function renderIngredients(focusSectionId) {
-  const showQty = qtyToggle.checked;
-  const main = mainSection();
-  const subs = draft.sections.slice(1);
-  const closed = subs.filter(x => !x.open);
-  const open = subs.filter(x => x.open);
-  const validated = main.items.filter(x => !x.pending);
-  const pending = main.items.filter(x => x.pending);
-  const pendingCount = pending.length;
-
-  // Liste principale : ingrédients, puis sous-rubriques terminées, puis suggestions à valider
-  const mainHtml = `
-    <div class="ing-section" data-sid="${main.id}">
-      <ul class="ingredient-list">
-        ${validated.map(it => itemRowHtml(it, main, showQty)).join("")}
-        ${closed.map(groupRowHtml).join("")}
-        ${pending.map(it => itemRowHtml(it, main, showQty)).join("")}
-      </ul>
-      ${pendingCount ? `<p class="hint">✨ ${pendingCount} suggestion${pendingCount > 1 ? "s" : ""} de l'analyse à valider (✓) ou retirer (✕). Celles non validées ne seront pas enregistrées.</p>` : ""}
-      <div class="add-inline ac-wrap">
-        <input type="text" class="ing-input" data-sid="${main.id}" placeholder="Ajouter un ingrédient…" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false">
-        <button type="button" class="small-btn" data-add-to="${main.id}">Ajouter</button>
-      </div>
-    </div>`;
-
-  // Sous-rubriques en cours de remplissage
-  const openHtml = open.map(s => `
-    <div class="ing-section sub" data-sid="${s.id}">
+// Sous-rubrique en cours de modification : s'ouvre à sa place dans la liste
+function subEditorHtml(s, showQty) {
+  return `
+    <li class="ing-section sub-editor${justAdded.has(s.id) ? " entering" : ""}" data-sid="${s.id}">
       <div class="ing-section-head">
         ${sectionNameHtml(s)}
         <span class="ing-section-actions">
@@ -657,9 +615,39 @@ function renderIngredients(focusSectionId) {
         <input type="text" class="ing-input" data-sid="${s.id}" placeholder="Ajouter dans « ${escapeHtml(s.name)} »…" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false">
         <button type="button" class="small-btn" data-add-to="${s.id}">Ajouter</button>
       </div>
-    </div>`).join("");
+    </li>`;
+}
 
-  ingSections.innerHTML = mainHtml + openHtml;
+function renderIngredients(focusSectionId) {
+  const showQty = qtyToggle.checked;
+  const main = mainSection();
+  const subs = draft.sections.slice(1);
+  const validated = main.items.filter(x => !x.pending);
+  const pending = main.items.filter(x => x.pending);
+  const pendingCount = pending.length;
+
+  // Liste principale : ingrédients, puis sous-rubriques terminées, puis suggestions à valider
+  const mainHtml = `
+    <div class="ing-section" data-sid="${main.id}">
+      <ul class="ingredient-list">
+        ${validated.map(it => itemRowHtml(it, main, showQty)).join("")}
+        ${subs.map(x => x.open ? subEditorHtml(x, showQty) : groupRowHtml(x)).join("")}
+        ${pending.map(it => itemRowHtml(it, main, showQty)).join("")}
+      </ul>
+      ${pendingCount ? `<div class="pending-bar">
+        <p class="hint">✨ ${pendingCount} suggestion${pendingCount > 1 ? "s" : ""} de l'analyse à valider (✓) ou retirer (✕). Celles non validées ne seront pas enregistrées.</p>
+        <span class="pending-actions">
+          ${pendingCount > 1 ? `<button type="button" class="text-btn ok" data-accept-all>${ICON_CHECK} Tout valider</button>
+          <button type="button" class="text-btn muted" data-reject-all>${ICON_X} Tout retirer</button>` : ""}
+        </span>
+      </div>` : ""}
+      <div class="add-inline ac-wrap">
+        <input type="text" class="ing-input" data-sid="${main.id}" placeholder="Ajouter un ingrédient…" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false">
+        <button type="button" class="small-btn" data-add-to="${main.id}">Ajouter</button>
+      </div>
+    </div>`;
+
+  ingSections.innerHTML = mainHtml;
   justAdded.clear();
   flashIds.clear();
   renderSectionChips();
@@ -704,6 +692,20 @@ ingSections.addEventListener("click", e => {
   const t = e.target.closest("button");
   if (!t) return;
   if (t.dataset.accept) { acceptItem(t.dataset.accept); renderIngredients(); }
+  else if (t.hasAttribute("data-accept-all")) {
+    mainSection().items.filter(x => x.pending).forEach(x => acceptItem(x.id));
+    analyzeStatus.textContent = "Toutes les suggestions ont été validées.";
+    renderIngredients();
+  }
+  else if (t.hasAttribute("data-reject-all")) {
+    const rows = ingSections.querySelectorAll(".ingredient.pending");
+    rows.forEach(r => r.classList.add("leaving"));
+    setTimeout(() => {
+      draft.sections.forEach(sec => (sec.items = sec.items.filter(x => !x.pending)));
+      analyzeStatus.textContent = "Suggestions retirées.";
+      renderIngredients();
+    }, 160);
+  }
   else if (t.dataset.remove) removeItem(t.dataset.remove);
   else if (t.dataset.addTo) submitTyped(ingSections.querySelector(`.ing-input[data-sid="${t.dataset.addTo}"]`));
   else if (t.dataset.closeSection) {
@@ -1007,6 +1009,7 @@ form.addEventListener("submit", e => {
       .map(i => ({ name: i.name, qty: i.qty.trim(), group: sec.name }))),
     recipeUrl,
     improve: form.improve.value.trim(),
+    notes: form.notes.value.trim(),
   };
   meals.push(meal);
   if (!saveMeals()) { meals.pop(); return; }

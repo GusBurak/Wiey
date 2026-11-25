@@ -489,6 +489,24 @@ h1, h2 { font-family: Fraunces, Georgia, serif; font-weight: 500; margin: 0; }
 
 .section-adder { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
 .section-adder .chip[hidden], .section-choices[hidden] { display: none; }
+/* Sous-rubrique ouverte à sa place dans la liste */
+.ing-section.sub-editor {
+  list-style: none; margin: 4px 0; padding: 10px 12px 12px;
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border));
+  border-radius: 10px; background: color-mix(in srgb, var(--accent-soft) 35%, var(--surface));
+}
+.ing-section.sub-editor.entering { animation: ing-in .28s ease-out; }
+.sub-editor .ingredient-list .ingredient:last-child { border-bottom: 1px solid var(--border); }
+
+/* Suggestions : tout valider / tout retirer */
+.pending-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.pending-bar .hint { flex: 1; min-width: 220px; }
+.pending-actions { display: flex; gap: 4px; }
+.text-btn.ok { color: #3b8a4f; }
+.text-btn.ok:hover { background: #e2f1e5; }
+.text-btn.muted { color: var(--muted); }
+.text-btn.muted:hover { background: var(--hover); color: var(--text); }
+
 /* Nom de sous-rubrique modifiable */
 .section-title { display: inline-flex; align-items: center; gap: 4px; min-width: 0; }
 .pen-btn {

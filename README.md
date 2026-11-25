@@ -8,4 +8,4 @@ Ouvrir `index.html` dans un navigateur. Aucune installation nécessaire.
 - `styles.css` : apparence
 - `app.js` : comportement (calendrier, aperçu au survol, détails au clic, ajout de repas)
 
-Les repas sont enregistrés dans le navigateur (localStorage). Au premier lancement, des repas d'exemple remplissent le mois en cours.
+Les repas sont enregistrés dans le navigateur (localStorage). Le site démarre vide : seuls les repas ajoutés par l’utilisateur sont affichés.
