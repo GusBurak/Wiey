@@ -6,7 +6,7 @@ Tentative de code pour la première fois : idée d'une application ou je peux re
 ## Lancer le site
 Ouvrir `index.html` dans un navigateur. Aucune installation nécessaire.
 
-- `index.html` : structure de la page (menu à gauche, calendrier, « Ajouter un repas », « Idée de repas »)
+- `index.html` : structure de la page (menu à gauche, calendrier en pleine page avec le bouton « Ajouter un repas »)
 - `styles.css` : apparence
 - `app.js` : comportement (calendrier, aperçu au survol, détails au clic, ajout de repas)
 

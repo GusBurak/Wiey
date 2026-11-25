@@ -138,8 +138,8 @@ h1, h2 { font-family: Fraunces, Georgia, serif; font-weight: 500; margin: 0; }
 }
 .home-view {
   display: grid;
-  /* calendrier ≈ 80 % de la hauteur, et il s'agrandit si les vignettes ont besoin de place */
-  grid-template-rows: minmax(min-content, 4fr) minmax(120px, 1fr);
+  /* calendrier en pleine page ; il s'agrandit si les vignettes ont besoin de place */
+  grid-template-rows: minmax(min-content, 1fr);
   gap: 16px;
   height: 100%;
 }
@@ -157,7 +157,13 @@ h1, h2 { font-family: Fraunces, Georgia, serif; font-weight: 500; margin: 0; }
 
 /* Calendrier */
 .calendar-card { display: flex; flex-direction: column; padding: 18px 20px 16px; min-height: auto; }
-.calendar-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+/* Titre à gauche, « Ajouter un repas » au centre de l'espace libre, navigation à droite */
+.calendar-header { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 12px; margin-bottom: 12px; }
+.calendar-header .calendar-nav { justify-self: end; }
+.header-add { display: inline-flex; align-items: center; gap: 8px; padding: 9px 16px; }
+.header-add svg { width: 16px; height: 16px; stroke-width: 2.4; }
+.photo-date-hint { margin: -4px 0 0; }
+.photo-date-hint[hidden] { display: none; }
 .calendar-header h1 { font-size: 26px; text-transform: capitalize; }
 .calendar-nav { display: flex; align-items: center; gap: 6px; }
 .icon-btn, .today-btn, .ghost-btn {
@@ -734,6 +740,8 @@ h1, h2 { font-family: Fraunces, Georgia, serif; font-weight: 500; margin: 0; }
   .bottom-row { grid-template-columns: 1fr; gap: 12px; }
   .calendar-card { padding: 14px 10px 10px; }
   .calendar-header h1 { font-size: 21px; }
+  .calendar-header { grid-template-columns: 1fr auto; }
+  .header-add { grid-column: 1 / -1; grid-row: 2; justify-content: center; }
   .today-btn { display: none; }
   .calendar-grid { gap: 3px; }
   .day { padding: 4px; }

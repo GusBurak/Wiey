@@ -332,31 +332,6 @@ function closeModals() { detailModal.hidden = true; }
 detailModal.addEventListener("click", e => { if (e.target === detailModal || e.target.closest("[data-close]")) closeModals(); });
 document.addEventListener("keydown", e => { if (e.key === "Escape") closeModals(); });
 
-// ---------- Qu'est-ce qu'on mange ? ----------
-const ideaBody = document.getElementById("ideaBody");
-let lastIdea = null;
-
-function renderIdea() {
-  // On propose un plat déjà mangé (en privilégiant les mieux notés), sans doublon de nom
-  const unique = [...new Map(meals.map(m => [m.name.toLowerCase(), m])).values()];
-  if (!unique.length) {
-    ideaBody.innerHTML = `<p class="idea-empty">Ajoute quelques repas : on piochera dedans pour te donner des idées.</p>`;
-    return;
-  }
-  const pool = unique.length > 1 ? unique.filter(m => m.name !== lastIdea) : unique;
-  const weights = pool.map(m => (m.rating || 3) ** 2);
-  let r = Math.random() * weights.reduce((a, b) => a + b, 0);
-  const pick = pool.find((_, i) => (r -= weights[i]) < 0) || pool[0];
-  lastIdea = pick.name;
-  const lastTime = meals.filter(m => m.name === pick.name).map(m => m.date).sort().pop();
-  ideaBody.innerHTML = `
-    <div class="idea-photo" style="background:${photoBg(pick)}">${photoHtml(pick)}</div>
-    <div class="idea-text">
-      <strong>${escapeHtml(pick.name)}</strong>
-      <span>${escapeHtml(mealMoment(pick))} · dernière fois ${formatDate(lastTime)}</span>
-    </div>`;
-}
-document.getElementById("nextIdea").onclick = renderIdea;
 
 // ---------- Récents (menu de gauche) ----------
 function renderRecent() {
@@ -411,6 +386,7 @@ function openAddPage(meal, presetDate) {
   renderCourse();
   photoDrop.style.backgroundImage = draft.photo ? `url(${draft.photo})` : "";
   photoDrop.classList.toggle("has-photo", !!draft.photo);
+  document.getElementById("photoDateHint").hidden = true;
   document.querySelectorAll(".add-form .invalid").forEach(el => el.classList.remove("invalid"));
   document.querySelectorAll(".field-error").forEach(el => (el.hidden = true));
   preparerAddRow.hidden = true;
@@ -476,6 +452,8 @@ function dataUrlToBlob(dataUrl) {
 photoInput.addEventListener("change", () => {
   const file = photoInput.files[0];
   if (!file) return;
+  // La date de prise de vue est lue dans le fichier d'origine (la réduction ci-dessous l'efface)
+  readPhotoDate(file).then(applyPhotoDate);
   const img = new Image();
   img.onload = () => {
     const max = 900, scale = Math.min(1, max / Math.max(img.width, img.height));
@@ -494,6 +472,65 @@ photoInput.addEventListener("change", () => {
   };
   img.onerror = () => notify("Cette image n'a pas pu être lue.");
   img.src = URL.createObjectURL(file);
+});
+
+// ---------- Date de prise de vue (données EXIF des photos JPEG) ----------
+async function readPhotoDate(file) {
+  try {
+    const v = new DataView(await file.slice(0, 512 * 1024).arrayBuffer());
+    if (v.byteLength < 4 || v.getUint16(0) !== 0xFFD8) return null; // pas un JPEG
+    let off = 2;
+    while (off + 10 < v.byteLength) {
+      const marker = v.getUint16(off), size = v.getUint16(off + 2);
+      if ((marker & 0xFF00) !== 0xFF00) break;
+      if (marker === 0xFFE1 && v.getUint32(off + 4) === 0x45786966) return parseExifDate(v, off + 10); // « Exif »
+      if (marker === 0xFFDA) break; // début de l'image : plus de métadonnées après
+      off += 2 + size;
+    }
+  } catch (e) { /* fichier illisible : on ignore */ }
+  return null;
+}
+function parseExifDate(v, tiff) {
+  const little = v.getUint16(tiff) === 0x4949;
+  const u16 = o => v.getUint16(o, little), u32 = o => v.getUint32(o, little);
+  const tags = ifd => { const out = {}; const n = u16(ifd); for (let i = 0; i < n; i++) { const e = ifd + 2 + i * 12; out[u16(e)] = e; } return out; };
+  const text = e => {
+    const count = u32(e + 4), at = count > 4 ? tiff + u32(e + 8) : e + 8;
+    let str = ""; for (let i = 0; i < count - 1 && at + i < v.byteLength; i++) str += String.fromCharCode(v.getUint8(at + i));
+    return str;
+  };
+  const ifd0 = tags(tiff + u32(tiff + 4));
+  let raw = null;
+  if (ifd0[0x8769]) { // sous-dossier Exif : DateTimeOriginal (prise de vue), sinon DateTimeDigitized
+    const exif = tags(tiff + u32(ifd0[0x8769] + 8));
+    if (exif[0x9003]) raw = text(exif[0x9003]); else if (exif[0x9004]) raw = text(exif[0x9004]);
+  }
+  if (!raw && ifd0[0x0132]) raw = text(ifd0[0x0132]); // DateTime
+  const m = raw && raw.match(/^(\d{4}):(\d{2}):(\d{2})[ T](\d{2}):(\d{2})/);
+  return m ? { date: `${m[1]}-${m[2]}-${m[3]}`, hour: Number(m[4]) } : null;
+}
+function applyPhotoDate(info) {
+  const hint = document.getElementById("photoDateHint");
+  hint.hidden = true;
+  if (!info || info.date < "2000-01-01" || info.date > iso(new Date())) return;
+  const previous = form.date.value;
+  if (previous === info.date) {
+    hint.textContent = "📅 La date correspond à celle de la photo.";
+    hint.hidden = false;
+    return;
+  }
+  form.date.value = info.date;
+  form.date.dispatchEvent(new Event("change"));
+  hint.innerHTML = `📅 Date reprise de la photo : ${escapeHtml(formatDate(info.date))}` +
+    (previous ? ` · <button type="button" class="link-inline" data-keep-date="${previous}">garder le ${escapeHtml(formatDate(previous))}</button>` : "");
+  hint.hidden = false;
+}
+document.getElementById("photoDateHint").addEventListener("click", e => {
+  const keep = e.target.closest("[data-keep-date]");
+  if (!keep) return;
+  form.date.value = keep.dataset.keepDate;
+  form.date.dispatchEvent(new Event("change"));
+  e.currentTarget.hidden = true;
 });
 
 // ---------- Pastilles à cocher pour « Repas » et « Préparé par » ----------
@@ -1677,7 +1714,7 @@ document.addEventListener("click", e => {
 });
 
 // ---------- Lancement ----------
-function refresh() { renderCalendar(); renderRecent(); renderIdea(); }
+function refresh() { renderCalendar(); renderRecent(); }
 initSample();
 initPlaces();
 renderRecent();

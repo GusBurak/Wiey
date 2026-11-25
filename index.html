@@ -55,6 +55,10 @@
       <section class="card calendar-card">
         <header class="calendar-header">
           <h1 id="monthTitle">Mois</h1>
+          <button type="button" class="primary-btn header-add" data-action="add">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+            Ajouter un repas
+          </button>
           <div class="calendar-nav">
             <button class="icon-btn" id="prevMonth" aria-label="Mois précédent">
               <svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg>
@@ -77,29 +81,6 @@
         <div class="calendar-grid" id="calendarGrid"></div>
       </section>
 
-      <!-- Rubriques 2 et 3 -->
-      <div class="bottom-row">
-        <section class="card action-card add-card" data-action="add" tabindex="0" role="button">
-          <div class="action-icon">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
-          </div>
-          <div>
-            <h2>Ajouter un repas</h2>
-            <p>Prends une photo, note ce que tu as mangé et à quel moment de la journée.</p>
-          </div>
-        </section>
-
-        <section class="card action-card idea-card coming-soon" aria-label="Idée de repas : bientôt disponible">
-          <div class="idea-inner" aria-hidden="true" inert>
-            <div class="idea-head">
-              <h2>Idée de repas</h2>
-              <button class="ghost-btn" id="nextIdea" tabindex="-1">Autre idée ↻</button>
-            </div>
-            <div class="idea-body" id="ideaBody"></div>
-          </div>
-          <span class="soon-badge">Bientôt disponible</span>
-        </section>
-      </div>
       </div>
 
       <!-- ===== Vue « Ajouter un repas » ===== -->
@@ -145,6 +126,7 @@
               <span class="field-label">Date</span>
               <input type="date" name="date" required>
             </label>
+            <p class="hint photo-date-hint" id="photoDateHint" hidden></p>
             <!-- Repas : pastilles (le select caché garde la valeur) -->
             <div class="inline-field">
               <span class="field-label">Repas</span>
