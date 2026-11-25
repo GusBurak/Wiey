@@ -388,6 +388,7 @@ function openAddPage(meal) {
   closeSectionChooser();
   closeAutocomplete();
   renamingId = null;
+  editingItemId = null;
   renderIngredients();
   updateAnalyzeState();
 }
@@ -1001,12 +1002,17 @@ function moveItem(itemId, targetSid) {
 
 const ICON_PEN = `<svg viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16z M13.5 6.5l4 4"/></svg>`;
 let renamingId = null; // sous-rubrique dont le nom est en cours de modification
+let editingItemId = null; // ingrédient dont le nom est en cours de modification
 
 function itemRowHtml(it, s, showQty) {
   return `
     <li class="ingredient${it.pending ? " pending" : ""}${justAdded.has(it.id) ? " entering" : ""}${flashIds.has(it.id) ? " flash" : ""}" data-iid="${it.id}">
       ${it.pending ? `<span class="pending-mark" title="Suggestion de l'analyse photo">✨</span>` : ""}
-      <span class="ingredient-name">${escapeHtml(it.name)}</span>
+      ${editingItemId === it.id
+        ? `<input type="text" class="item-edit-input" data-edit-item="${it.id}" value="${escapeHtml(it.name)}" maxlength="60" aria-label="Modifier l'ingrédient">`
+        : it.pending
+          ? `<span class="ingredient-name">${escapeHtml(it.name)}</span>`
+          : `<span class="ingredient-name editable" data-edit-name="${it.id}" title="Cliquer pour modifier">${escapeHtml(it.name)}<button type="button" class="pen-btn item-pen" data-edit-name="${it.id}" aria-label="Modifier ${escapeHtml(it.name)}">${ICON_PEN}</button></span>`}
       ${it.pending ? `
         <button type="button" class="round-btn ok" data-accept="${it.id}" aria-label="Valider ${escapeHtml(it.name)}">${ICON_CHECK}</button>
         <button type="button" class="round-btn no" data-remove="${it.id}" aria-label="Retirer ${escapeHtml(it.name)}">${ICON_X}</button>`
@@ -1097,7 +1103,7 @@ function renderIngredients(focusSectionId) {
   justAdded.clear();
   flashIds.clear();
   renderSectionChips();
-  const renameInput = ingSections.querySelector(".rename-input");
+  const renameInput = ingSections.querySelector(".rename-input, .item-edit-input");
   if (renameInput) { renameInput.focus(); renameInput.select(); }
   else if (focusSectionId) ingSections.querySelector(`.ing-input[data-sid="${focusSectionId}"]`)?.focus();
 }
@@ -1122,6 +1128,38 @@ ingSections.addEventListener("keydown", e => {
 });
 ingSections.addEventListener("focusout", e => {
   if (e.target.matches(".rename-input")) commitRename(e.target, true);
+});
+
+// ---------- Modifier le nom d'un ingrédient ----------
+function commitItemEdit(input, keep) {
+  if (editingItemId !== input.dataset.editItem) return;
+  const found = findItem(editingItemId);
+  editingItemId = null;
+  if (keep && found) {
+    const name = capitalize(singularize(input.value.trim().slice(0, 60)));
+    if (!name) notify("Le nom de l'ingrédient ne peut pas être vide.");
+    else if (name !== found.item.name) {
+      const clash = findByName(name);
+      if (clash && clash !== found.item) { notify(`« ${clash.name} » est déjà dans la liste.`); flashIds.add(clash.id); }
+      else { found.item.name = name; flashIds.add(found.item.id); }
+    }
+  }
+  renderIngredients();
+}
+ingSections.addEventListener("click", e => {
+  const t = e.target.closest("[data-edit-name]");
+  if (!t || editingItemId) return;
+  editingItemId = t.dataset.editName;
+  closeAutocomplete();
+  renderIngredients();
+});
+ingSections.addEventListener("keydown", e => {
+  if (!e.target.matches(".item-edit-input")) return;
+  if (e.key === "Enter") { e.preventDefault(); commitItemEdit(e.target, true); }
+  if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); commitItemEdit(e.target, false); }
+});
+ingSections.addEventListener("focusout", e => {
+  if (e.target.matches(".item-edit-input")) commitItemEdit(e.target, true);
 });
 
 // Saisie manuelle : plusieurs ingrédients possibles, séparés par des virgules

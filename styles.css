@@ -473,6 +473,11 @@ h1, h2 { font-family: Fraunces, Georgia, serif; font-weight: 500; margin: 0; }
 .ingredient.pending .ingredient-name { color: var(--muted); font-style: italic; }
 .pending-mark { font-size: 12px; }
 .ingredient-name { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.ingredient-name.editable { cursor: text; display: flex; align-items: center; gap: 2px; }
+.item-pen { opacity: 0; }
+.ingredient:hover .item-pen, .item-pen:focus-visible { opacity: .6; }
+@media (hover: none) { .item-pen { opacity: .5; } }
+.add-form input.item-edit-input { flex: 1; min-width: 0; padding: 5px 9px; font-size: 14px; }
 .qty-text { color: var(--muted); font-size: 13px; }
 .add-form input.qty-input { width: 120px; flex-shrink: 0; padding: 5px 9px; font-size: 13px; }
 .round-btn {
@@ -610,7 +615,7 @@ h1, h2 { font-family: Fraunces, Georgia, serif; font-weight: 500; margin: 0; }
 }
 .danger-solid-btn:hover { filter: brightness(1.08); }
 .toast {
-  position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 300;
+  position: fixed; left: 50%; bottom: 84px; transform: translateX(-50%); z-index: 300;
   background: var(--text); color: var(--bg); padding: 10px 16px; border-radius: 10px;
   font-size: 13px; box-shadow: 0 8px 24px rgba(0, 0, 0, .2); max-width: calc(100vw - 32px);
 }
