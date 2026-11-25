@@ -57,6 +57,8 @@
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
       </button>
 
+      <!-- ===== Vue accueil ===== -->
+      <div class="home-view" id="homeView">
       <!-- Rubrique 1 : calendrier -->
       <section class="card calendar-card">
         <header class="calendar-header">
@@ -97,6 +99,138 @@
           <div class="idea-body" id="ideaBody"></div>
         </section>
       </div>
+      </div>
+
+      <!-- ===== Vue « Ajouter un repas » ===== -->
+      <div class="add-view" id="addView" hidden>
+        <header class="add-header">
+          <a href="#" class="back-link">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>
+            Calendrier
+          </a>
+          <h1>Ajouter un repas</h1>
+        </header>
+
+        <form id="addForm" class="add-form" novalidate>
+          <!-- Photo -->
+          <section class="field-block">
+            <label class="photo-drop" id="photoDrop">
+              <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" id="photoInput" hidden>
+              <span class="photo-hint">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>
+                Ajouter une photo
+              </span>
+              <span class="photo-change">Changer la photo</span>
+            </label>
+          </section>
+
+          <!-- Nom, date, repas -->
+          <section class="field-block">
+            <label class="field">
+              <span class="field-label">Nom du plat</span>
+              <input type="text" name="name" required placeholder="Ex. Salade de lentilles" autocomplete="off">
+              <span class="field-error" id="nameError" hidden>Donne un nom à ce plat.</span>
+            </label>
+            <div class="field-row">
+              <label class="field">
+                <span class="field-label">Date</span>
+                <input type="date" name="date" required>
+              </label>
+              <label class="field">
+                <span class="field-label">Repas</span>
+                <select name="type">
+                  <option>Petit-déjeuner</option>
+                  <option>Déjeuner</option>
+                  <option>Goûter</option>
+                  <option>Dîner</option>
+                </select>
+              </label>
+            </div>
+          </section>
+
+          <!-- Préparé par -->
+          <section class="field-block">
+            <div class="inline-field">
+              <span class="field-label">Préparé par</span>
+              <select name="preparedBy" id="preparedBy" class="tag-select">
+                <option>Moi</option>
+                <option>Un proche</option>
+                <option>Un resto</option>
+              </select>
+            </div>
+            <div class="picker" id="preparerPicker" hidden>
+              <div class="chip-list" id="preparerChips" role="radiogroup"></div>
+              <div class="add-inline" id="preparerAddRow" hidden>
+                <input type="text" id="preparerNew" autocomplete="off">
+                <button type="button" class="small-btn" id="preparerNewOk">Ajouter</button>
+              </div>
+            </div>
+          </section>
+
+          <!-- Note -->
+          <section class="field-block">
+            <div class="inline-field">
+              <span class="field-label">Note</span>
+              <div class="stars" id="stars" role="radiogroup" aria-label="Note sur 5"></div>
+              <span class="stars-label" id="starsLabel"></span>
+            </div>
+          </section>
+
+          <!-- Ingrédients -->
+          <section class="field-block">
+            <div class="block-head">
+              <span class="field-label">Ingrédients</span>
+              <label class="toggle">
+                <input type="checkbox" id="qtyToggle">
+                <span class="toggle-track"></span>
+                Quantités
+              </label>
+            </div>
+
+            <div class="analyze-row" id="analyzeRow">
+              <button type="button" class="analyze-btn" id="analyzeBtn" disabled>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8zM19 15l.9 2.1 2.1.9-2.1.9L19 21l-.9-2.1L16 18l2.1-.9z"/></svg>
+                Analyser la photo
+              </button>
+              <span class="analyze-status" id="analyzeStatus">Ajoute une photo pour obtenir des suggestions.</span>
+            </div>
+
+            <div class="suggestions" id="suggestions" hidden>
+              <p class="hint">Valide ou retire chaque suggestion&nbsp;:</p>
+              <ul class="suggestion-list" id="suggestionList"></ul>
+            </div>
+
+            <ul class="ingredient-list" id="ingredientList"></ul>
+
+            <div class="add-inline">
+              <input type="text" id="ingredientNew" placeholder="Ajouter un ingrédient…" autocomplete="off">
+              <button type="button" class="small-btn" id="ingredientNewOk">Ajouter</button>
+            </div>
+          </section>
+
+          <!-- Recette -->
+          <section class="field-block">
+            <label class="field">
+              <span class="field-label">Lien de la recette</span>
+              <input type="url" name="recipeUrl" placeholder="https://…" autocomplete="off">
+              <span class="field-error" id="urlError" hidden>Ce lien doit commencer par http:// ou https://</span>
+            </label>
+          </section>
+
+          <!-- Améliorable -->
+          <section class="field-block">
+            <label class="field">
+              <span class="field-label">Ce qui est améliorable</span>
+              <textarea name="improve" rows="3" placeholder="Moins salé, plus de légumes, cuisson plus courte…"></textarea>
+            </label>
+          </section>
+
+          <div class="form-actions">
+            <a href="#" class="ghost-btn link-btn">Annuler</a>
+            <button type="submit" class="primary-btn">Enregistrer le repas</button>
+          </div>
+        </form>
+      </div>
     </main>
   </div>
 
@@ -108,40 +242,6 @@
     <div class="modal" role="dialog" aria-modal="true">
       <button class="modal-close" data-close aria-label="Fermer">×</button>
       <div id="detailContent"></div>
-    </div>
-  </div>
-
-  <!-- Fenêtre ajout -->
-  <div class="modal-backdrop" id="addModal" hidden>
-    <div class="modal" role="dialog" aria-modal="true">
-      <button class="modal-close" data-close aria-label="Fermer">×</button>
-      <h2 class="modal-title">Ajouter un repas</h2>
-      <form id="addForm" class="form">
-        <label class="photo-drop" id="photoDrop">
-          <input type="file" accept="image/*" id="photoInput" hidden>
-          <span id="photoHint">📷 Ajouter une photo</span>
-        </label>
-        <label>Nom du plat
-          <input type="text" name="name" required placeholder="Ex. Salade de lentilles">
-        </label>
-        <div class="form-row">
-          <label>Date
-            <input type="date" name="date" required>
-          </label>
-          <label>Repas
-            <select name="type">
-              <option>Petit-déjeuner</option>
-              <option selected>Déjeuner</option>
-              <option>Goûter</option>
-              <option>Dîner</option>
-            </select>
-          </label>
-        </div>
-        <label>Notes
-          <textarea name="notes" rows="2" placeholder="Ingrédients, restaurant, ressenti…"></textarea>
-        </label>
-        <button type="submit" class="primary-btn">Enregistrer</button>
-      </form>
     </div>
   </div>
 
