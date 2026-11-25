@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Wiey</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app">
+    <!-- Bande de gauche : menu -->
+    <aside class="sidebar" id="sidebar">
+      <div class="brand">
+        <span class="brand-mark">W</span>
+        <span class="brand-name">Wiey</span>
+      </div>
+
+      <button class="new-meal-btn" data-action="add">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+        Nouveau repas
+      </button>
+
+      <nav class="menu">
+        <a href="#" class="menu-item active">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/></svg>
+          Calendrier
+        </a>
+        <a href="#" class="menu-item">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
+          Historique
+        </a>
+        <a href="#" class="menu-item">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l2.6 5.6 6.1.7-4.5 4.2 1.2 6L12 16.6 6.6 19.5l1.2-6L3.3 9.3l6.1-.7z"/></svg>
+          Favoris
+        </a>
+        <a href="#" class="menu-item">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>
+          Statistiques
+        </a>
+      </nav>
+
+      <div class="menu-section-title">Récents</div>
+      <ul class="recent-list" id="recentList"></ul>
+
+      <div class="sidebar-footer">
+        <span class="avatar">A</span>
+        <span>Mon profil</span>
+      </div>
+    </aside>
+
+    <!-- Contenu de droite -->
+    <main class="content">
+      <button class="menu-toggle" id="menuToggle" aria-label="Ouvrir le menu">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+      </button>
+
+      <!-- Rubrique 1 : calendrier -->
+      <section class="card calendar-card">
+        <header class="calendar-header">
+          <h1 id="monthTitle">Mois</h1>
+          <div class="calendar-nav">
+            <button class="icon-btn" id="prevMonth" aria-label="Mois précédent">
+              <svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg>
+            </button>
+            <button class="today-btn" id="todayBtn">Aujourd'hui</button>
+            <button class="icon-btn" id="nextMonth" aria-label="Mois suivant">
+              <svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>
+            </button>
+          </div>
+        </header>
+        <div class="weekdays">
+          <span>Lun</span><span>Mar</span><span>Mer</span><span>Jeu</span><span>Ven</span><span>Sam</span><span>Dim</span>
+        </div>
+        <div class="calendar-grid" id="calendarGrid"></div>
+      </section>
+
+      <!-- Rubriques 2 et 3 -->
+      <div class="bottom-row">
+        <section class="card action-card add-card" data-action="add" tabindex="0" role="button">
+          <div class="action-icon">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+          </div>
+          <div>
+            <h2>Ajouter un repas</h2>
+            <p>Prends une photo, note ce que tu as mangé et à quel moment de la journée.</p>
+          </div>
+        </section>
+
+        <section class="card action-card idea-card">
+          <div class="idea-head">
+            <h2>Qu'est-ce qu'on mange&nbsp;?</h2>
+            <button class="ghost-btn" id="nextIdea">Autre idée ↻</button>
+          </div>
+          <div class="idea-body" id="ideaBody"></div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <!-- Aperçu au survol -->
+  <div class="hover-preview" id="hoverPreview" aria-hidden="true"></div>
+
+  <!-- Fenêtre détails -->
+  <div class="modal-backdrop" id="detailModal" hidden>
+    <div class="modal" role="dialog" aria-modal="true">
+      <button class="modal-close" data-close aria-label="Fermer">×</button>
+      <div id="detailContent"></div>
+    </div>
+  </div>
+
+  <!-- Fenêtre ajout -->
+  <div class="modal-backdrop" id="addModal" hidden>
+    <div class="modal" role="dialog" aria-modal="true">
+      <button class="modal-close" data-close aria-label="Fermer">×</button>
+      <h2 class="modal-title">Ajouter un repas</h2>
+      <form id="addForm" class="form">
+        <label class="photo-drop" id="photoDrop">
+          <input type="file" accept="image/*" id="photoInput" hidden>
+          <span id="photoHint">📷 Ajouter une photo</span>
+        </label>
+        <label>Nom du plat
+          <input type="text" name="name" required placeholder="Ex. Salade de lentilles">
+        </label>
+        <div class="form-row">
+          <label>Date
+            <input type="date" name="date" required>
+          </label>
+          <label>Repas
+            <select name="type">
+              <option>Petit-déjeuner</option>
+              <option selected>Déjeuner</option>
+              <option>Goûter</option>
+              <option>Dîner</option>
+            </select>
+          </label>
+        </div>
+        <label>Notes
+          <textarea name="notes" rows="2" placeholder="Ingrédients, restaurant, ressenti…"></textarea>
+        </label>
+        <button type="submit" class="primary-btn">Enregistrer</button>
+      </form>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
