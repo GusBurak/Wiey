@@ -107,8 +107,17 @@
         </header>
 
         <form id="addForm" class="add-form" novalidate>
+          <!-- Restes : bascule le formulaire sur un plat déjà mangé -->
+          <div class="leftover-bar">
+            <label class="toggle">
+              <input type="checkbox" id="leftoverToggle">
+              <span class="toggle-track"></span>
+              <span>♻️ Restes</span>
+            </label>
+          </div>
+
           <!-- Photo -->
-          <section class="field-block">
+          <section class="field-block normal-only">
             <label class="photo-drop" id="photoDrop">
               <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" id="photoInput" hidden>
               <span class="photo-hint">
@@ -121,7 +130,7 @@
 
           <!-- Nom, date, repas -->
           <section class="field-block">
-            <label class="field">
+            <label class="field normal-only">
               <span class="field-label">Nom du plat</span>
               <input type="text" name="name" required placeholder="Ex. Salade de lentilles" autocomplete="off">
               <span class="field-error" id="nameError" hidden>Donne un nom à ce plat.</span>
@@ -148,8 +157,16 @@
             </div>
           </section>
 
+          <!-- Restes : choix du plat -->
+          <section class="field-block leftover-only" id="leftoverPanel">
+            <span class="field-label">Quel plat ?</span>
+            <p class="hint">Plats mangés sur les 7 derniers jours ouvrés. Le reste de la fiche est repris de la première fois où tu l'as mangé.</p>
+            <div class="leftover-list" id="leftoverList" role="radiogroup" aria-label="Plat à reprendre"></div>
+            <span class="field-error" id="leftoverError" hidden>Choisis le plat que tu as mangé en restes.</span>
+          </section>
+
           <!-- Préparé par -->
-          <section class="field-block">
+          <section class="field-block normal-only">
             <div class="inline-field">
               <span class="field-label">Préparé par</span>
               <select name="preparedBy" id="preparedBy" hidden>
@@ -178,7 +195,7 @@
           </section>
 
           <!-- Note -->
-          <section class="field-block">
+          <section class="field-block normal-only">
             <div class="inline-field">
               <span class="field-label">Note</span>
               <div class="stars" id="stars" tabindex="0" role="slider" aria-label="Note sur 5" aria-valuemin="0" aria-valuemax="5"></div>
@@ -187,7 +204,7 @@
           </section>
 
           <!-- Ingrédients -->
-          <section class="field-block">
+          <section class="field-block normal-only">
             <div class="block-head">
               <span class="field-label">Ingrédients</span>
               <label class="toggle">
@@ -228,7 +245,7 @@
           </section>
 
           <!-- Recette -->
-          <section class="field-block">
+          <section class="field-block normal-only">
             <label class="field">
               <span class="field-label">Lien de la recette</span>
               <input type="url" name="recipeUrl" placeholder="https://…" autocomplete="off">
@@ -237,7 +254,7 @@
           </section>
 
           <!-- Améliorable -->
-          <section class="field-block">
+          <section class="field-block normal-only">
             <label class="field">
               <span class="field-label">Ce qui est améliorable</span>
               <textarea name="improve" rows="3" placeholder="Moins salé, plus de légumes, cuisson plus courte…"></textarea>
@@ -245,7 +262,7 @@
           </section>
 
           <!-- Notes -->
-          <section class="field-block">
+          <section class="field-block normal-only">
             <label class="field">
               <span class="field-label">Notes</span>
               <textarea name="notes" rows="3" placeholder="Contexte, ressenti, avec qui, envie de le refaire…"></textarea>

@@ -196,7 +196,7 @@ function renderCalendar() {
       </div>
       <div class="thumbs">
         ${dayMeals.map(meal => `
-          <button class="thumb" data-id="${escapeHtml(meal.id)}" style="background:${photoBg(meal)}" aria-label="${escapeHtml(mealMoment(meal) + " : " + meal.name)}">
+          <button class="thumb${meal.leftover ? " leftover" : ""}" data-id="${escapeHtml(meal.id)}" style="background:${photoBg(meal)}" aria-label="${escapeHtml(mealMoment(meal) + " : " + meal.name)}">
             ${photoHtml(meal)}
           </button>`).join("")}
       </div>
@@ -219,7 +219,7 @@ function showPreview(thumb) {
   preview.classList.toggle("with-photo", !!meal.photo);
   preview.innerHTML = `
     <div class="preview-photo" style="background:${photoBg(meal)}">${photoHtml(meal)}</div>
-    <div class="preview-info"><strong>${escapeHtml(meal.name)}</strong><span>${escapeHtml(mealMoment(meal))} · ${formatDate(meal.date)}${stars}</span></div>`;
+    <div class="preview-info"><strong>${escapeHtml(meal.name)}${meal.leftover ? " ♻️" : ""}</strong><span>${escapeHtml(mealMoment(meal))} · ${formatDate(meal.date)}${stars}</span></div>`;
 
   // Aperçu centré à l'écran
   preview.style.left = "50%";
@@ -251,6 +251,7 @@ function openDetail(id) {
     <h2 class="modal-title" style="margin-bottom:0">${escapeHtml(meal.name)}</h2>
     <div class="detail-meta">
       <span class="tag">${escapeHtml(mealMoment(meal))}</span>
+      ${meal.leftover ? `<span class="tag neutral">♻️ Restes</span>` : ""}
       <span class="tag neutral">${formatDate(meal.date)}</span>
       ${prepared ? `<span class="tag neutral">${escapeHtml(prepared)}</span>` : ""}
       ${meal.rating ? `<span class="tag neutral detail-stars" aria-label="${formatRating(meal.rating)}">${starsHtml(meal.rating, "mini")}<span>${formatRating(meal.rating)}</span></span>` : ""}
@@ -360,7 +361,7 @@ const sectionOther = document.getElementById("sectionOther");
 // État du formulaire en cours
 let draft;
 function resetDraft() {
-  draft = { photo: null, photoBlob: null, preparer: "", rating: 0, sections: [{ id: newId(), name: "", items: [] }], course: "Plat", preparerAddress: "" };
+  draft = { photo: null, photoBlob: null, preparer: "", rating: 0, sections: [{ id: newId(), name: "", items: [] }], course: "Plat", preparerAddress: "", leftover: false, leftoverName: "" };
 }
 
 function openAddPage(meal, presetDate) {
@@ -391,6 +392,8 @@ function openAddPage(meal, presetDate) {
   renderPreparer();
   renderTypeChips();
   renderPreparedByChips();
+  if (meal?.leftover) draft.leftoverName = meal.name;
+  setLeftoverMode(!!meal?.leftover);
   renderStars();
   closeSectionChooser();
   closeAutocomplete();
@@ -1465,6 +1468,7 @@ function setError(input, errorEl, show) {
 
 form.addEventListener("submit", e => {
   e.preventDefault();
+  if (draft.leftover) { saveLeftover(); return; }
   const name = form.name.value.trim();
   const recipeUrl = form.recipeUrl.value.trim();
   const badName = !name;
@@ -1500,6 +1504,10 @@ form.addEventListener("submit", e => {
     improve: form.improve.value.trim(),
     notes: form.notes.value.trim(),
   };
+  storeMeal(meal);
+});
+
+function storeMeal(meal) {
   const previous = meals.slice();
   const idx = draft.editingId ? meals.findIndex(m => m.id === draft.editingId) : -1;
   if (idx >= 0) meals[idx] = meal; else meals.push(meal);
@@ -1507,7 +1515,123 @@ form.addEventListener("submit", e => {
   const [yy, mm] = meal.date.split("-").map(Number);
   viewDate = new Date(yy, mm - 1, 1);
   goHome();
+}
+
+// =====================================================
+// Restes : reprendre un plat mangé sur les 7 derniers jours ouvrés
+// =====================================================
+const leftoverToggle = document.getElementById("leftoverToggle");
+const leftoverList = document.getElementById("leftoverList");
+const leftoverError = document.getElementById("leftoverError");
+
+// Premier jour de la fenêtre : on remonte jusqu'au 7e jour ouvré (lundi → vendredi)
+function leftoverWindowStart(dateIso) {
+  const [y, m, d] = dateIso.split("-").map(Number);
+  const day = new Date(y, m - 1, d);
+  let count = 0;
+  for (;;) {
+    const wd = day.getDay();
+    if (wd !== 0 && wd !== 6 && ++count === 7) break;
+    day.setDate(day.getDate() - 1);
+  }
+  return iso(day);
+}
+
+// Plats proposés : un par nom, le plus récent d'abord
+function leftoverCandidates() {
+  const end = form.date.value || iso(new Date());
+  const start = leftoverWindowStart(end);
+  const byName = new Map();
+  meals
+    .filter(m => m.id !== draft.editingId && m.date >= start && m.date <= end)
+    .sort((a, b) => b.date.localeCompare(a.date) || sortByMoment(b, a))
+    .forEach(m => { const k = normalizeText(m.name); if (!byName.has(k)) byName.set(k, m); });
+  // En modification, le plat déjà choisi reste proposé même s'il sort de la fenêtre
+  if (draft.leftoverName && !byName.has(normalizeText(draft.leftoverName))) {
+    const src = firstOccurrence(draft.leftoverName);
+    if (src) byName.set(normalizeText(src.name), src);
+  }
+  return [...byName.values()];
+}
+
+// Première fois où le plat a été mangé (hors restes) : c'est elle qui sert de modèle
+function firstOccurrence(name) {
+  const key = normalizeText(name);
+  const same = meals.filter(m => m.id !== draft.editingId && normalizeText(m.name) === key)
+    .sort((a, b) => a.date.localeCompare(b.date) || sortByMoment(a, b));
+  return same.find(m => !m.leftover) || same[0] || null;
+}
+
+function renderLeftovers() {
+  const list = leftoverCandidates();
+  if (!list.length) {
+    leftoverList.innerHTML = `<p class="hint">Aucun plat enregistré sur les 7 derniers jours ouvrés avant le ${escapeHtml(formatDate(form.date.value || iso(new Date())))}.</p>`;
+    return;
+  }
+  const selectedKey = normalizeText(draft.leftoverName);
+  leftoverList.innerHTML = list.map(m => {
+    const on = normalizeText(m.name) === selectedKey;
+    return `<button type="button" class="leftover-item${on ? " selected" : ""}" role="radio" aria-checked="${on}" data-leftover="${escapeHtml(m.name)}">
+      <span class="leftover-thumb" style="background:${photoBg(m)}">${photoHtml(m)}</span>
+      <span class="leftover-text">
+        <strong>${escapeHtml(m.name)}</strong>
+        <small>${escapeHtml(mealMoment(m))} · ${escapeHtml(formatDate(m.date))}</small>
+      </span>
+      ${on ? `<span class="leftover-check">${ICON_CHECK}</span>` : ""}
+    </button>`;
+  }).join("");
+}
+
+function setLeftoverMode(on) {
+  draft.leftover = on;
+  leftoverToggle.checked = on;
+  form.classList.toggle("leftover-mode", on);
+  leftoverError.hidden = true;
+  closeAutocomplete();
+  closePlaceList();
+  if (on) renderLeftovers();
+}
+leftoverToggle.addEventListener("change", () => setLeftoverMode(leftoverToggle.checked));
+form.date.addEventListener("change", () => { if (draft.leftover) renderLeftovers(); });
+
+leftoverList.addEventListener("click", e => {
+  const item = e.target.closest("[data-leftover]");
+  if (!item) return;
+  draft.leftoverName = item.dataset.leftover;
+  // Le moment du repas reprend celui d'origine (modifiable)
+  const src = firstOccurrence(draft.leftoverName);
+  if (src?.course) { draft.course = src.course; renderCourse(); }
+  leftoverError.hidden = true;
+  renderLeftovers();
 });
+
+function saveLeftover() {
+  const src = draft.leftoverName && firstOccurrence(draft.leftoverName);
+  if (!src) { leftoverError.hidden = false; leftoverList.querySelector("button")?.focus(); return; }
+  if (!form.date.value) form.date.value = iso(new Date());
+  const type = form.type.value;
+  // Tout est repris de la première occurrence, sauf la date et le repas
+  storeMeal({
+    id: draft.editingId || `m-${Date.now()}`,
+    name: src.name,
+    date: form.date.value,
+    type,
+    course: COURSE_MEALS.includes(type) ? (draft.course || src.course || "Plat") : "",
+    photo: src.photo || null,
+    emoji: null,
+    color: null,
+    preparedBy: src.preparedBy || "Moi",
+    preparer: src.preparer || "",
+    preparerAddress: src.preparerAddress || "",
+    rating: src.rating || 0,
+    ingredients: (src.ingredients || []).map(i => ({ ...i })),
+    recipeUrl: src.recipeUrl || "",
+    improve: src.improve || "",
+    notes: src.notes || "",
+    leftover: true,
+    leftoverOf: src.id,
+  });
+}
 
 // ---------- Menu mobile ----------
 const sidebar = document.getElementById("sidebar");
