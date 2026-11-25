@@ -61,6 +61,15 @@ function save(key, value) {
 }
 
 let meals = load(KEYS.meals, () => []);
+// Repas avec photo mais sans miniature recadrée : on la calcule une fois, en arrière-plan
+async function backfillThumbs() {
+  let changed = false;
+  for (const m of meals) {
+    if (!m.photo || m.thumb) continue;
+    try { m.thumb = await makeSmartThumb(m.photo); changed = true; } catch (e) { /* photo illisible */ }
+  }
+  if (changed) { saveMeals(); renderCalendar(); renderRecent(); }
+}
 let people = load(KEYS.people, () => []);
 let restaurants = load(KEYS.restaurants, () => []);
 let restaurantInfo = load(KEYS.restaurantInfo, () => ({})); // nom du resto → adresse
@@ -96,6 +105,11 @@ function escapeHtml(s) {
 }
 function photoHtml(meal) {
   if (meal.photo) return `<img src="${meal.photo}" alt="">`;
+  return escapeHtml(guessEmoji(meal));
+}
+// Miniature recadrée sur l'assiette (calendrier, listes) ; la photo entière sinon
+function thumbHtml(meal) {
+  if (meal.photo) return `<img src="${meal.thumb || meal.photo}" alt="">`;
   return escapeHtml(guessEmoji(meal));
 }
 
@@ -206,7 +220,7 @@ function renderCalendar() {
           <button class="thumb ${prepClass(meal)}${meal.leftover ? " leftover" : ""}"${more
             ? ` data-day="${dateIso}" data-more="+${more}" aria-label="${dayMeals.length} repas le ${escapeHtml(formatDate(dateIso))} : voir tout"`
             : ` data-id="${escapeHtml(meal.id)}" aria-label="${escapeHtml(mealMoment(meal) + " : " + meal.name)}"`} style="background:${photoBg(meal)}">
-            ${photoHtml(meal)}
+            ${thumbHtml(meal)}
           </button>`;
         }).join("")}
       </div>
@@ -306,7 +320,7 @@ function openDayList(dateIso) {
     <div class="leftover-list day-list">
       ${dayMeals.map(m => `
         <button type="button" class="leftover-item" data-open-meal="${escapeHtml(m.id)}">
-          <span class="leftover-thumb thumb-border ${prepClass(m)}" style="background:${photoBg(m)}">${photoHtml(m)}</span>
+          <span class="leftover-thumb thumb-border ${prepClass(m)}" style="background:${photoBg(m)}">${thumbHtml(m)}</span>
           <span class="leftover-text"><strong>${escapeHtml(m.name)}${m.leftover ? " ♻️" : ""}</strong><small>${escapeHtml(mealMoment(m))}${preparedLabel(m) ? " · " + escapeHtml(preparedLabel(m)) : ""}</small></span>
         </button>`).join("")}
     </div>
@@ -421,6 +435,7 @@ function fillDraftFromMeal(meal) {
   form.improve.value = meal.improve || "";
   form.notes.value = meal.notes || "";
   draft.photo = meal.photo || null;
+  draft.thumb = meal.thumb || null;
   draft.photoBlob = meal.photo ? dataUrlToBlob(meal.photo) : null;
   draft.rating = meal.rating || 0;
   draft.course = meal.course || "Plat";
@@ -462,6 +477,9 @@ photoInput.addEventListener("change", () => {
     canvas.height = Math.round(img.height * scale);
     canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
     draft.photo = canvas.toDataURL("image/jpeg", 0.8);
+    draft.thumb = null;
+    const forPhoto = draft.photo;
+    makeSmartThumb(forPhoto).then(t => { if (draft.photo === forPhoto) draft.thumb = t; }).catch(() => {});
     canvas.toBlob(b => { draft.photoBlob = b; updateAnalyzeState(); }, "image/jpeg", 0.85);
     photoDrop.style.backgroundImage = `url(${draft.photo})`;
     photoDrop.classList.add("has-photo");
@@ -1563,6 +1581,7 @@ form.addEventListener("submit", e => {
     type,
     course: COURSE_MEALS.includes(type) ? draft.course : "",
     photo: draft.photo,
+    thumb: draft.photo ? draft.thumb : null,
     emoji: null, // calculé à l'affichage (guessEmoji) quand il n'y a pas de photo
     color: null,
     preparedBy: preparedBy.value,
@@ -1584,6 +1603,7 @@ function storeMeal(meal) {
   const idx = draft.editingId ? meals.findIndex(m => m.id === draft.editingId) : -1;
   if (idx >= 0) meals[idx] = meal; else meals.push(meal);
   if (!saveMeals()) { meals = previous; return; }
+  backfillThumbs(); // au cas où la miniature n'était pas encore prête à l'enregistrement
   const [yy, mm] = meal.date.split("-").map(Number);
   viewDate = new Date(yy, mm - 1, 1);
   goHome();
@@ -1644,7 +1664,7 @@ function renderLeftovers() {
   leftoverList.innerHTML = list.map(m => {
     const on = normalizeText(m.name) === selectedKey;
     return `<button type="button" class="leftover-item${on ? " selected" : ""}" role="radio" aria-checked="${on}" data-leftover="${escapeHtml(m.name)}">
-      <span class="leftover-thumb" style="background:${photoBg(m)}">${photoHtml(m)}</span>
+      <span class="leftover-thumb" style="background:${photoBg(m)}">${thumbHtml(m)}</span>
       <span class="leftover-text">
         <strong>${escapeHtml(m.name)}</strong>
         <small>${escapeHtml(mealMoment(m))} · ${escapeHtml(formatDate(m.date))}</small>
@@ -1690,6 +1710,7 @@ function saveLeftover() {
     type,
     course: COURSE_MEALS.includes(type) ? (draft.course || src.course || "Plat") : "",
     photo: src.photo || null,
+    thumb: src.thumb || null,
     emoji: null,
     color: null,
     preparedBy: src.preparedBy || "Moi",
@@ -1717,5 +1738,6 @@ document.addEventListener("click", e => {
 function refresh() { renderCalendar(); renderRecent(); }
 initSample();
 initPlaces();
+backfillThumbs();
 renderRecent();
 route();
