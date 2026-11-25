@@ -3,7 +3,7 @@
 // Les données sont stockées dans le navigateur (localStorage).
 // =====================================================
 
-const KEYS = { meals: "wiey.meals", people: "wiey.people", restaurants: "wiey.restaurants", restaurantInfo: "wiey.restaurantInfo", near: "wiey.near" };
+const KEYS = { meals: "wiey.meals", people: "wiey.people", restaurants: "wiey.restaurants", restaurantInfo: "wiey.restaurantInfo", near: "wiey.near", deliveries: "wiey.deliveries" };
 const MEAL_TYPES = ["Petit-déjeuner", "Déjeuner", "Goûter", "Dîner"];
 const TYPE_EMOJI = { "Petit-déjeuner": "🥐", "Déjeuner": "🥗", "Goûter": "🍎", "Dîner": "🍝" };
 const COURSES = ["Apéritif", "Entrée", "Plat", "Dessert"];
@@ -27,6 +27,7 @@ let meals = load(KEYS.meals, () => []);
 let people = load(KEYS.people, () => []);
 let restaurants = load(KEYS.restaurants, () => []);
 let restaurantInfo = load(KEYS.restaurantInfo, () => ({})); // nom du resto → adresse
+let deliveries = load(KEYS.deliveries, () => []); // restos déjà commandés en livraison
 let nearPlace = load(KEYS.near, () => null); // { name, longitude, latitude } : ville de référence pour la recherche
 const saveMeals = () => save(KEYS.meals, meals);
 
@@ -58,7 +59,36 @@ function escapeHtml(s) {
 }
 function photoHtml(meal) {
   if (meal.photo) return `<img src="${meal.photo}" alt="">`;
-  return escapeHtml(meal.emoji || TYPE_EMOJI[meal.type] || "🍽️");
+  return escapeHtml(guessEmoji(meal));
+}
+
+// Sans photo : un emoji choisi d'après le nom du plat, puis les ingrédients, puis le moment du repas
+const EMOJI_RULES = [
+  [/pizza/, "🍕"], [/burger|hamburger/, "🍔"], [/sushi|maki|sashimi|california/, "🍣"],
+  [/ramen|\bpho\b|nouille|udon|soba/, "🍜"], [/spaghetti|pates|lasagne|tagliatelle|penne|carbonara|bolognaise|gnocchi|ravioli/, "🍝"],
+  [/curry|\bdal\b|tikka|masala/, "🍛"], [/taco|burrito|fajita|quesadilla|nachos/, "🌮"], [/kebab|shawarma|wrap|pita/, "🥙"],
+  [/hot ?dog/, "🌭"], [/sandwich|panini|croque|club/, "🥪"], [/bagel/, "🥯"], [/falafel/, "🧆"],
+  [/ravioli chinois|dim sum|gyoza|dumpling|\bbao\b/, "🥟"], [/soupe|veloute|potage|bouillon|pot-au-feu|minestrone/, "🍲"],
+  [/salade|bowl|poke|buddha/, "🥗"], [/crepe|galette|pancake|gaufre/, "🥞"], [/croissant|viennoiserie|pain au chocolat/, "🥐"],
+  [/quiche|tourte|feuillete/, "🥧"], [/frite/, "🍟"], [/omelette|oeuf/, "🍳"], [/riz|risotto|paella/, "🍚"],
+  [/crevette|gambas|scampi/, "🍤"], [/poisson|saumon|thon|cabillaud|\bbar\b|dorade|truite|sardine|moule|fruits de mer/, "🐟"],
+  [/barbecue|bbq|merguez|saucisse|grillade|brochette|ribs|chipolata/, "🍖"],
+  [/poulet|dinde|canard|volaille|nugget/, "🍗"], [/steak|boeuf|entrecote|bavette|agneau|veau|porc|cote|roti|viande/, "🥩"],
+  [/fromage|raclette|fondue|tartiflette|camembert/, "🧀"], [/glace|sorbet/, "🍨"], [/cookie|biscuit/, "🍪"],
+  [/chocolat|brownie|fondant/, "🍫"], [/gateau|tarte|cheesecake|tiramisu|patisserie|clafoutis|eclair|cake|dessert|flan|mousse/, "🍰"],
+  [/yaourt|granola|muesli|porridge|cereale|skyr/, "🥣"], [/tartine|toast|pain|baguette/, "🍞"],
+  [/avocat|guacamole/, "🥑"], [/banane/, "🍌"], [/pomme de terre|patate|puree/, "🥔"], [/pomme|poire/, "🍎"], [/fraise|framboise|fruits rouges|myrtille/, "🍓"],
+  [/orange|clementine|agrume/, "🍊"], [/fruit/, "🍇"], [/legume|brocoli|courgette|ratatouille|haricot|epinard/, "🥦"],
+  [/cafe|cappuccino|latte/, "☕"], [/\bthe\b|tisane|infusion/, "🍵"], [/smoothie|jus/, "🥤"], [/\bvin\b|champagne|apero|cocktail/, "🥂"], [/biere/, "🍺"],
+];
+const COURSE_EMOJI = { "Apéritif": "🥂", "Entrée": "🥗", "Dessert": "🍰" };
+const DEFAULT_EMOJI = { "Petit-déjeuner": "🥐", "Déjeuner": "🍽️", "Goûter": "🍪", "Dîner": "🍽️" };
+function guessEmoji(meal) {
+  const find = text => { const n = normalizeText(text || ""); const r = EMOJI_RULES.find(([re]) => re.test(n)); return r && r[1]; };
+  return find(meal.name)
+    || (meal.ingredients || []).map(i => find(i.name)).find(Boolean)
+    || COURSE_EMOJI[meal.course]
+    || DEFAULT_EMOJI[meal.type] || "🍽️";
 }
 function photoBg(meal) {
   return meal.photo ? "transparent" : (meal.color || "var(--accent-soft)");
@@ -72,6 +102,7 @@ function preparedLabel(meal) {
   if (!meal.preparedBy) return "";
   if (meal.preparedBy === "Moi") return "Fait maison";
   if (meal.preparedBy === "Un proche") return meal.preparer ? `Par ${meal.preparer}` : "Par un proche";
+  if (meal.preparedBy === "Livraison") return meal.preparer ? `Livré par ${meal.preparer}` : "En livraison";
   return meal.preparer ? `Chez ${meal.preparer}` : "Au restaurant";
 }
 function isWebLink(url) { return /^https?:\/\/\S+$/i.test(url); }
@@ -435,8 +466,14 @@ courseChips.addEventListener("keydown", e => {
 });
 
 // ---------- Préparé par ----------
-function preparerList() { return preparedBy.value === "Un proche" ? people : restaurants; }
+function preparerList() {
+  return { "Un proche": people, "Un resto": restaurants, "Livraison": deliveries }[preparedBy.value] || [];
+}
+function preparerKey() {
+  return { "Un proche": KEYS.people, "Un resto": KEYS.restaurants, "Livraison": KEYS.deliveries }[preparedBy.value];
+}
 const isResto = () => preparedBy.value === "Un resto";
+const isDelivery = () => preparedBy.value === "Livraison";
 
 function renderPreparer() {
   const mode = preparedBy.value;
@@ -446,10 +483,10 @@ function renderPreparer() {
   if (draft.preparer && !list.includes(draft.preparer)) draft.preparer = "";
   preparerChips.innerHTML =
     list.map(n => `<button type="button" class="chip" role="radio" aria-checked="${n === draft.preparer}" data-name="${escapeHtml(n)}">${escapeHtml(n)}</button>`).join("") +
-    (isResto() ? "" : `<button type="button" class="chip add-chip" data-add>+ Ajouter un proche</button>`);
+    (isResto() ? "" : `<button type="button" class="chip add-chip" data-add>+ ${isDelivery() ? "Ajouter un resto" : "Ajouter un proche"}</button>`);
   // Pour un resto, le champ de recherche est toujours visible
   if (isResto()) preparerAddRow.hidden = false;
-  preparerNew.placeholder = isResto() ? "Rechercher un restaurant…" : "Prénom du proche";
+  preparerNew.placeholder = isResto() ? "Rechercher un restaurant…" : isDelivery() ? "Nom du resto qui a livré" : "Prénom du proche";
   renderNear();
   preparerNewOk.textContent = isResto() ? "Ajouter" : "Ajouter";
 }
@@ -487,7 +524,7 @@ function addPreparer(name = preparerNew.value.trim(), address = "") {
   if (!existing) {
     list.push(name);
     list.sort((a, b) => a.localeCompare(b, "fr"));
-    save(isResto() ? KEYS.restaurants : KEYS.people, list);
+    save(preparerKey(), list);
   }
   draft.preparer = existing || name;
   if (isResto()) {
@@ -649,7 +686,9 @@ function parsePlaces(result) {
 function renderPlaceList() {
   const q = preparerNew.value.trim();
   const nq = normalizeText(q);
-  const saved = preparerList()
+  // Un resto : uniquement les suggestions Mapbox. Livraison : tous les restos déjà enregistrés.
+  const pool = isResto() ? [] : isDelivery() ? [...new Set([...deliveries, ...restaurants])] : people;
+  const saved = pool
     .filter(n => normalizeText(n).includes(nq) && normalizeText(n) !== "")
     .sort((a, b) => normalizeText(a).indexOf(nq) - normalizeText(b).indexOf(nq))
     .slice(0, 4)
@@ -1356,7 +1395,7 @@ form.addEventListener("submit", e => {
     type,
     course: COURSE_MEALS.includes(type) ? draft.course : "",
     photo: draft.photo,
-    emoji: TYPE_EMOJI[type],
+    emoji: null, // calculé à l'affichage (guessEmoji) quand il n'y a pas de photo
     color: null,
     preparedBy: preparedBy.value,
     preparer: preparedBy.value === "Moi" ? "" : draft.preparer,
