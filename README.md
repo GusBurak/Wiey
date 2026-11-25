@@ -1,10 +1,12 @@
-# Wiey
+# Qu'est-ce qu'on mange ?
+(dépôt « Wiey »)
+
 Tentative de code pour la première fois : idée d'une application ou je peux rentrer tout ce que je mange.
 
 ## Lancer le site
 Ouvrir `index.html` dans un navigateur. Aucune installation nécessaire.
 
-- `index.html` : structure de la page (menu à gauche, calendrier, « Ajouter un repas », « Qu'est-ce qu'on mange ? »)
+- `index.html` : structure de la page (menu à gauche, calendrier, « Ajouter un repas », « Idée de repas »)
 - `styles.css` : apparence
 - `app.js` : comportement (calendrier, aperçu au survol, détails au clic, ajout de repas)
 
