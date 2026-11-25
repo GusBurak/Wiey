@@ -199,10 +199,16 @@ function renderCalendar() {
         <button type="button" class="day-add" data-add-date="${dateIso}" aria-label="Ajouter un repas le ${formatDate(dateIso)}" title="Ajouter un repas ce jour-là">+</button>
       </div>
       <div class="thumbs">
-        ${dayMeals.map(meal => `
-          <button class="thumb ${prepClass(meal)}${meal.leftover ? " leftover" : ""}" data-id="${escapeHtml(meal.id)}" style="background:${photoBg(meal)}" aria-label="${escapeHtml(mealMoment(meal) + " : " + meal.name)}">
+        ${dayMeals.slice(0, 2).map((meal, i) => {
+          // Au-delà de 2 repas, la 2e vignette affiche « +N » et ouvre la liste du jour
+          const more = i === 1 && dayMeals.length > 2 ? dayMeals.length - 2 : 0;
+          return `
+          <button class="thumb ${prepClass(meal)}${meal.leftover ? " leftover" : ""}"${more
+            ? ` data-day="${dateIso}" data-more="+${more}" aria-label="${dayMeals.length} repas le ${escapeHtml(formatDate(dateIso))} : voir tout"`
+            : ` data-id="${escapeHtml(meal.id)}" aria-label="${escapeHtml(mealMoment(meal) + " : " + meal.name)}"`} style="background:${photoBg(meal)}">
             ${photoHtml(meal)}
-          </button>`).join("")}
+          </button>`;
+        }).join("")}
       </div>
     </div>`;
   }
@@ -232,13 +238,16 @@ function showPreview(thumb) {
 }
 function hidePreview() { preview.classList.remove("visible"); }
 
-grid.addEventListener("mouseover", e => { const t = e.target.closest(".thumb"); if (t) showPreview(t); });
+grid.addEventListener("mouseover", e => { const t = e.target.closest(".thumb"); if (t && t.dataset.id) showPreview(t); });
 grid.addEventListener("mouseout", e => { if (e.target.closest(".thumb") && !e.relatedTarget?.closest?.(".thumb")) hidePreview(); });
 grid.addEventListener("click", e => {
   const add = e.target.closest("[data-add-date]");
   if (add) { location.hash = "ajouter/" + add.dataset.addDate; return; }
   const t = e.target.closest(".thumb");
-  if (t) { hidePreview(); openDetail(t.dataset.id); }
+  if (!t) return;
+  hidePreview();
+  if (t.dataset.day) openDayList(t.dataset.day);
+  else openDetail(t.dataset.id);
 });
 
 // ---------- Fenêtre détails ----------
@@ -273,6 +282,10 @@ function openDetail(id) {
 }
 
 detailContent.addEventListener("click", async e => {
+  const open = e.target.closest("[data-open-meal]");
+  if (open) { openDetail(open.dataset.openMeal); return; }
+  const addDay = e.target.closest("[data-add-day]");
+  if (addDay) { location.hash = "ajouter/" + addDay.dataset.addDay; return; }
   if (e.target.dataset.edit) { location.hash = "modifier/" + encodeURIComponent(e.target.dataset.edit); return; }
   const id = e.target.dataset.delete;
   if (!id) return;
@@ -284,6 +297,24 @@ detailContent.addEventListener("click", async e => {
   refresh();
   notify("Repas supprimé.");
 });
+
+// Liste de tous les repas d'un jour (vignette « +N »)
+function openDayList(dateIso) {
+  const dayMeals = meals.filter(m => m.date === dateIso).sort(sortByMoment);
+  detailContent.innerHTML = `
+    <h2 class="modal-title">${escapeHtml(formatDate(dateIso))}</h2>
+    <div class="leftover-list day-list">
+      ${dayMeals.map(m => `
+        <button type="button" class="leftover-item" data-open-meal="${escapeHtml(m.id)}">
+          <span class="leftover-thumb thumb-border ${prepClass(m)}" style="background:${photoBg(m)}">${photoHtml(m)}</span>
+          <span class="leftover-text"><strong>${escapeHtml(m.name)}${m.leftover ? " ♻️" : ""}</strong><small>${escapeHtml(mealMoment(m))}${preparedLabel(m) ? " · " + escapeHtml(preparedLabel(m)) : ""}</small></span>
+        </button>`).join("")}
+    </div>
+    <div class="detail-actions" style="margin-top:14px">
+      <button class="primary-btn small" data-add-day="${dateIso}">+ Ajouter un repas ce jour-là</button>
+    </div>`;
+  detailModal.hidden = false;
+}
 
 // Ingrédients regroupés : liste principale puis sous-rubriques
 function ingredientsDetailHtml(ingredients) {
