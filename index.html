@@ -171,7 +171,7 @@
           <section class="field-block">
             <div class="inline-field">
               <span class="field-label">Note</span>
-              <div class="stars" id="stars" role="radiogroup" aria-label="Note sur 5"></div>
+              <div class="stars" id="stars" tabindex="0" role="slider" aria-label="Note sur 5" aria-valuemin="0" aria-valuemax="5"></div>
               <span class="stars-label" id="starsLabel"></span>
             </div>
           </section>
@@ -195,16 +195,18 @@
               <span class="analyze-status" id="analyzeStatus">Ajoute une photo pour obtenir des suggestions.</span>
             </div>
 
-            <div class="suggestions" id="suggestions" hidden>
-              <p class="hint">Valide ou retire chaque suggestion&nbsp;:</p>
-              <ul class="suggestion-list" id="suggestionList"></ul>
-            </div>
+            <!-- Liste principale + sous-rubriques (générées par app.js) -->
+            <div class="ing-sections" id="ingSections"></div>
 
-            <ul class="ingredient-list" id="ingredientList"></ul>
-
-            <div class="add-inline">
-              <input type="text" id="ingredientNew" placeholder="Ajouter un ingrédient…" autocomplete="off">
-              <button type="button" class="small-btn" id="ingredientNewOk">Ajouter</button>
+            <div class="section-adder" id="sectionAdder">
+              <button type="button" class="chip add-chip" id="addSectionBtn">+ Ajouter une sous-rubrique</button>
+              <div class="section-choices" id="sectionChoices" hidden>
+                <div class="chip-list" id="sectionChips"></div>
+                <div class="add-inline" id="sectionOtherRow" hidden>
+                  <input type="text" id="sectionOther" placeholder="Nom de la sous-rubrique" autocomplete="off">
+                  <button type="button" class="small-btn" id="sectionOtherOk">Créer</button>
+                </div>
+              </div>
             </div>
           </section>
 
@@ -245,6 +247,7 @@
     </div>
   </div>
 
+  <script src="ingredients.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

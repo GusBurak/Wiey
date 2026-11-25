@@ -174,7 +174,7 @@ const preview = document.getElementById("hoverPreview");
 function showPreview(thumb) {
   const meal = meals.find(x => x.id === thumb.dataset.id);
   if (!meal) return;
-  const stars = meal.rating ? ` · ${"★".repeat(meal.rating)}` : "";
+  const stars = meal.rating ? ` · ★ ${meal.rating.toLocaleString("fr-FR")}` : "";
   preview.innerHTML = `
     <div class="preview-photo" style="background:${photoBg(meal)}">${photoHtml(meal)}</div>
     <div class="preview-info"><strong>${escapeHtml(meal.name)}</strong><span>${meal.type} · ${formatDate(meal.date)}${stars}</span></div>`;
@@ -215,10 +215,9 @@ function openDetail(id) {
       <span class="tag">${meal.type}</span>
       <span class="tag neutral">${formatDate(meal.date)}</span>
       ${prepared ? `<span class="tag neutral">${escapeHtml(prepared)}</span>` : ""}
-      ${meal.rating ? `<span class="tag neutral detail-stars" aria-label="${meal.rating} sur 5">${"★".repeat(meal.rating)}${"☆".repeat(5 - meal.rating)}</span>` : ""}
+      ${meal.rating ? `<span class="tag neutral detail-stars" aria-label="${formatRating(meal.rating)}">${starsHtml(meal.rating, "mini")}<span>${formatRating(meal.rating)}</span></span>` : ""}
     </div>
-    ${ingredients.length ? `<div class="detail-section"><h3>Ingrédients</h3><ul>${ingredients
-      .map(i => `<li>${escapeHtml(i.name)}${i.qty ? ` — ${escapeHtml(i.qty)}` : ""}</li>`).join("")}</ul></div>` : ""}
+    ${ingredientsDetailHtml(ingredients)}
     ${meal.recipeUrl && isWebLink(meal.recipeUrl) ? `<div class="detail-section"><h3>Recette</h3><p><a href="${escapeHtml(meal.recipeUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(meal.recipeUrl)}</a></p></div>` : ""}
     ${meal.improve ? `<div class="detail-section"><h3>À améliorer</h3><p>${escapeHtml(meal.improve)}</p></div>` : ""}
     ${meal.notes ? `<div class="detail-section"><h3>Notes</h3><p>${escapeHtml(meal.notes)}</p></div>` : ""}
@@ -234,6 +233,18 @@ detailContent.addEventListener("click", e => {
   closeModals();
   refresh();
 });
+
+// Ingrédients regroupés : liste principale puis sous-rubriques
+function ingredientsDetailHtml(ingredients) {
+  if (!ingredients.length) return "";
+  const groups = new Map();
+  ingredients.forEach(i => { const g = i.group || ""; if (!groups.has(g)) groups.set(g, []); groups.get(g).push(i); });
+  const list = items => `<ul>${items.map(i => `<li>${escapeHtml(i.name)}${i.qty ? ` — ${escapeHtml(i.qty)}` : ""}</li>`).join("")}</ul>`;
+  const main = groups.get("") || [];
+  groups.delete("");
+  return `<div class="detail-section"><h3>Ingrédients</h3>${main.length ? list(main) : ""}${
+    [...groups].map(([g, items]) => `<h4>${escapeHtml(g)}</h4>${list(items)}`).join("")}</div>`;
+}
 
 function closeModals() { detailModal.hidden = true; }
 detailModal.addEventListener("click", e => { if (e.target === detailModal || e.target.closest("[data-close]")) closeModals(); });
@@ -293,15 +304,17 @@ const starsLabel = document.getElementById("starsLabel");
 const qtyToggle = document.getElementById("qtyToggle");
 const analyzeBtn = document.getElementById("analyzeBtn");
 const analyzeStatus = document.getElementById("analyzeStatus");
-const suggestionsBox = document.getElementById("suggestions");
-const suggestionList = document.getElementById("suggestionList");
-const ingredientList = document.getElementById("ingredientList");
-const ingredientNew = document.getElementById("ingredientNew");
+const ingSections = document.getElementById("ingSections");
+const addSectionBtn = document.getElementById("addSectionBtn");
+const sectionChoices = document.getElementById("sectionChoices");
+const sectionChips = document.getElementById("sectionChips");
+const sectionOtherRow = document.getElementById("sectionOtherRow");
+const sectionOther = document.getElementById("sectionOther");
 
 // État du formulaire en cours
 let draft;
 function resetDraft() {
-  draft = { photo: null, photoBlob: null, preparer: "", rating: 0, ingredients: [], suggestions: [] };
+  draft = { photo: null, photoBlob: null, preparer: "", rating: 0, sections: [{ id: newId(), name: "", items: [] }] };
 }
 
 function openAddPage() {
@@ -315,7 +328,10 @@ function openAddPage() {
   document.querySelectorAll(".field-error").forEach(el => (el.hidden = true));
   renderPreparer();
   renderStars();
-  renderSuggestions();
+  sectionChoices.hidden = true;
+  sectionOtherRow.hidden = true;
+  addSectionBtn.hidden = false;
+  closeAutocomplete();
   renderIngredients();
   updateAnalyzeState();
 }
@@ -345,9 +361,9 @@ photoInput.addEventListener("change", () => {
     photoDrop.style.backgroundImage = `url(${draft.photo})`;
     photoDrop.classList.add("has-photo");
     URL.revokeObjectURL(img.src);
-    // Nouvelle photo : les anciennes suggestions ne valent plus
-    draft.suggestions = [];
-    renderSuggestions();
+    // Nouvelle photo : les anciennes suggestions non validées ne valent plus
+    draft.sections.forEach(sec => (sec.items = sec.items.filter(x => !x.pending)));
+    renderIngredients();
   };
   img.onerror = () => alert("Cette image n'a pas pu être lue.");
   img.src = URL.createObjectURL(file);
@@ -411,94 +427,315 @@ preparerNew.addEventListener("keydown", e => {
   if (e.key === "Escape") { e.stopPropagation(); preparerAddRow.hidden = true; }
 });
 
-// ---------- Note sur 5 ----------
-function renderStars() {
-  starsEl.innerHTML = [1, 2, 3, 4, 5].map(n =>
-    `<button type="button" class="star${n <= draft.rating ? " on" : ""}" role="radio" aria-checked="${n === draft.rating}" aria-label="${n} sur 5" data-n="${n}">${ICON_STAR}</button>`).join("");
-  starsLabel.textContent = draft.rating ? RATING_LABELS[draft.rating] : "Pas encore noté";
+// ---------- Note sur 5 (demi-étoiles possibles) ----------
+function starsHtml(rating, cls = "") {
+  return [1, 2, 3, 4, 5].map(n => {
+    const fill = Math.max(0, Math.min(1, rating - (n - 1))) * 100;
+    return `<span class="star ${cls}" data-n="${n}"><span class="star-bg">${ICON_STAR}</span><span class="star-fill" style="width:${fill}%">${ICON_STAR}</span></span>`;
+  }).join("");
+}
+function formatRating(r) { return r.toLocaleString("fr-FR") + "/5"; }
+function ratingLabel(r) {
+  if (!r) return "Pas encore noté";
+  return `${formatRating(r)} · ${RATING_LABELS[Math.ceil(r)]}`;
+}
+function renderStars(preview) {
+  const value = preview ?? draft.rating;
+  starsEl.innerHTML = starsHtml(value);
+  starsEl.setAttribute("aria-valuenow", draft.rating);
+  starsEl.setAttribute("aria-valuetext", ratingLabel(draft.rating));
+  starsLabel.textContent = ratingLabel(value);
+}
+// Moitié gauche d'une étoile = demi-point, moitié droite = point entier
+function ratingFromPointer(e) {
+  const star = e.target.closest(".star");
+  if (!star) return null;
+  const r = star.getBoundingClientRect();
+  return Number(star.dataset.n) - (e.clientX - r.left < r.width / 2 ? 0.5 : 0);
 }
 starsEl.addEventListener("click", e => {
-  const star = e.target.closest(".star");
-  if (!star) return;
-  const n = Number(star.dataset.n);
-  draft.rating = draft.rating === n ? 0 : n; // recliquer sur la même étoile efface la note
+  const v = ratingFromPointer(e);
+  if (v == null) return;
+  draft.rating = draft.rating === v ? 0 : v; // recliquer sur la même valeur efface la note
   renderStars();
-  starsEl.querySelector(`[data-n="${n}"]`).focus();
 });
-starsEl.addEventListener("mouseover", e => {
-  const star = e.target.closest(".star");
-  if (!star) return;
-  const n = Number(star.dataset.n);
-  starsEl.querySelectorAll(".star").forEach(s => s.classList.toggle("on", Number(s.dataset.n) <= n));
+starsEl.addEventListener("mousemove", e => { const v = ratingFromPointer(e); if (v != null) renderStars(v); });
+starsEl.addEventListener("mouseleave", () => renderStars());
+starsEl.addEventListener("keydown", e => {
+  const steps = { ArrowRight: 0.5, ArrowUp: 0.5, ArrowLeft: -0.5, ArrowDown: -0.5 };
+  if (e.key in steps) draft.rating = Math.max(0, Math.min(5, draft.rating + steps[e.key]));
+  else if (e.key === "Home") draft.rating = 0;
+  else if (e.key === "End") draft.rating = 5;
+  else if (/^[0-5]$/.test(e.key)) draft.rating = Number(e.key);
+  else return;
+  e.preventDefault();
+  renderStars();
 });
-starsEl.addEventListener("mouseleave", renderStars);
 
 // ---------- Ingrédients ----------
-function hasIngredient(name) {
-  return draft.ingredients.some(i => i.name.toLowerCase() === name.toLowerCase());
+// draft.sections = [{ id, name, items: [{ id, name, qty, pending }] }]
+// La première section (sans nom) est la liste principale ; les autres sont des sous-rubriques.
+// « pending » = suggestion de l'analyse photo pas encore validée.
+const SECTION_SUGGESTIONS = ["Épices", "Herbes", "Sauce", "Assaisonnement", "Marinade", "Garniture", "Accompagnement", "Pâte"];
+let uid = 0;
+const newId = () => `x${++uid}`;
+const justAdded = new Set();   // éléments à animer à l'apparition
+const flashIds = new Set();    // éléments à faire clignoter (doublon, validation)
+
+function mainSection() { return draft.sections[0]; }
+function findItem(itemId) {
+  for (const s of draft.sections) {
+    const i = s.items.findIndex(x => x.id === itemId);
+    if (i >= 0) return { section: s, index: i, item: s.items[i] };
+  }
+  return null;
+}
+function findByName(name) {
+  const key = normalizeText(name);
+  for (const s of draft.sections) {
+    const item = s.items.find(x => normalizeText(x.name) === key);
+    if (item) return item;
+  }
+  return null;
+}
+function ingredientHistory() {
+  return meals.flatMap(m => (m.ingredients || []).map(i => capitalize(singularize(i.name))));
 }
 
-function renderIngredients() {
+// Ajoute un ingrédient (mis au singulier) à une section.
+// Les ingrédients validés passent avant les suggestions en attente.
+function addIngredient(sectionId, rawName, { pending = false } = {}) {
+  const name = capitalize(singularize(String(rawName).trim().slice(0, 60)));
+  if (!name) return null;
+  const existing = findByName(name);
+  if (existing) {
+    if (existing.pending && !pending) return acceptItem(existing.id, sectionId);
+    flashIds.add(existing.id);
+    return null;
+  }
+  const section = draft.sections.find(s => s.id === sectionId) || mainSection();
+  const item = { id: newId(), name, qty: "", pending };
+  if (pending) section.items.push(item);
+  else {
+    const firstPending = section.items.findIndex(x => x.pending);
+    section.items.splice(firstPending < 0 ? section.items.length : firstPending, 0, item);
+  }
+  justAdded.add(item.id);
+  return item;
+}
+
+// Valide une suggestion : elle rejoint la liste à la suite des ingrédients validés
+function acceptItem(itemId, targetSectionId) {
+  const found = findItem(itemId);
+  if (!found) return null;
+  found.section.items.splice(found.index, 1);
+  found.item.pending = false;
+  const target = draft.sections.find(s => s.id === targetSectionId) || found.section;
+  const firstPending = target.items.findIndex(x => x.pending);
+  target.items.splice(firstPending < 0 ? target.items.length : firstPending, 0, found.item);
+  flashIds.add(found.item.id);
+  return found.item;
+}
+
+// Retrait avec une petite animation de sortie
+function removeItem(itemId) {
+  const row = ingSections.querySelector(`[data-iid="${itemId}"]`);
+  const done = () => {
+    const found = findItem(itemId);
+    if (found) found.section.items.splice(found.index, 1);
+    renderIngredients();
+  };
+  if (!row) return done();
+  row.classList.add("leaving");
+  setTimeout(done, 160);
+}
+
+function renderIngredients(focusSectionId) {
   const showQty = qtyToggle.checked;
-  ingredientList.innerHTML = draft.ingredients.map((ing, idx) => `
-    <li class="ingredient">
-      <span class="ingredient-name">${escapeHtml(ing.name)}</span>
-      ${showQty ? `<input type="text" class="qty-input" data-idx="${idx}" value="${escapeHtml(ing.qty)}" placeholder="Ex. 200 g" aria-label="Quantité de ${escapeHtml(ing.name)}">` : (ing.qty ? `<span class="stars-label">${escapeHtml(ing.qty)}</span>` : "")}
-      <button type="button" class="remove-btn" data-remove="${idx}" aria-label="Retirer ${escapeHtml(ing.name)}">${ICON_X}</button>
-    </li>`).join("");
+  ingSections.innerHTML = draft.sections.map((s, sIdx) => {
+    const pendingCount = s.items.filter(x => x.pending).length;
+    return `
+    <div class="ing-section${sIdx ? " sub" : ""}" data-sid="${s.id}">
+      ${sIdx ? `<div class="ing-section-head">
+        <span class="ing-section-name">${escapeHtml(s.name)}</span>
+        <button type="button" class="remove-btn" data-remove-section="${s.id}" aria-label="Supprimer la sous-rubrique ${escapeHtml(s.name)}">${ICON_X}</button>
+      </div>` : ""}
+      <ul class="ingredient-list">
+        ${s.items.map(it => `
+        <li class="ingredient${it.pending ? " pending" : ""}${justAdded.has(it.id) ? " entering" : ""}${flashIds.has(it.id) ? " flash" : ""}" data-iid="${it.id}">
+          ${it.pending ? `<span class="pending-mark" title="Suggestion de l'analyse photo">✨</span>` : ""}
+          <span class="ingredient-name">${escapeHtml(it.name)}</span>
+          ${it.pending ? `
+            <button type="button" class="round-btn ok" data-accept="${it.id}" aria-label="Valider ${escapeHtml(it.name)}">${ICON_CHECK}</button>
+            <button type="button" class="round-btn no" data-remove="${it.id}" aria-label="Retirer ${escapeHtml(it.name)}">${ICON_X}</button>`
+          : `
+            ${showQty ? `<input type="text" class="qty-input" data-qty="${it.id}" value="${escapeHtml(it.qty)}" placeholder="Ex. 200 g" aria-label="Quantité de ${escapeHtml(it.name)}">` : (it.qty ? `<span class="qty-text">${escapeHtml(it.qty)}</span>` : "")}
+            <button type="button" class="round-btn no" data-remove="${it.id}" aria-label="Retirer ${escapeHtml(it.name)}">${ICON_X}</button>`}
+        </li>`).join("")}
+      </ul>
+      ${pendingCount ? `<p class="hint">✨ ${pendingCount} suggestion${pendingCount > 1 ? "s" : ""} de l'analyse à valider (✓) ou retirer (✕). Celles non validées ne seront pas enregistrées.</p>` : ""}
+      <div class="add-inline ac-wrap">
+        <input type="text" class="ing-input" data-sid="${s.id}" placeholder="${sIdx ? `Ajouter dans « ${escapeHtml(s.name)} »…` : "Ajouter un ingrédient…"}" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false">
+        <button type="button" class="small-btn" data-add-to="${s.id}">Ajouter</button>
+      </div>
+    </div>`;
+  }).join("");
+  justAdded.clear();
+  flashIds.clear();
+  renderSectionChips();
+  if (focusSectionId) ingSections.querySelector(`.ing-input[data-sid="${focusSectionId}"]`)?.focus();
 }
 
-function addIngredient(name) {
-  name = name.trim();
-  if (!name || hasIngredient(name)) return false;
-  draft.ingredients.push({ name: name[0].toUpperCase() + name.slice(1), qty: "" });
-  renderIngredients();
-  return true;
+// Saisie manuelle : plusieurs ingrédients possibles, séparés par des virgules
+function submitTyped(input, pickedName) {
+  const sid = input.dataset.sid;
+  const values = pickedName ? [pickedName] : input.value.split(",");
+  values.forEach(v => addIngredient(sid, v));
+  input.value = "";
+  closeAutocomplete();
+  renderIngredients(sid);
 }
 
-function addManualIngredient() {
-  const value = ingredientNew.value;
-  // Plusieurs ingrédients d'un coup, séparés par des virgules
-  value.split(",").forEach(addIngredient);
-  ingredientNew.value = "";
-  ingredientNew.focus();
-}
-document.getElementById("ingredientNewOk").addEventListener("click", addManualIngredient);
-ingredientNew.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); addManualIngredient(); } });
-
-ingredientList.addEventListener("click", e => {
-  const btn = e.target.closest("[data-remove]");
-  if (!btn) return;
-  draft.ingredients.splice(Number(btn.dataset.remove), 1);
-  renderIngredients();
+ingSections.addEventListener("click", e => {
+  const t = e.target.closest("button");
+  if (!t) return;
+  if (t.dataset.accept) { acceptItem(t.dataset.accept); renderIngredients(); }
+  else if (t.dataset.remove) removeItem(t.dataset.remove);
+  else if (t.dataset.addTo) submitTyped(ingSections.querySelector(`.ing-input[data-sid="${t.dataset.addTo}"]`));
+  else if (t.dataset.removeSection) {
+    const s = draft.sections.find(x => x.id === t.dataset.removeSection);
+    if (s.items.some(x => !x.pending) && !confirm(`Supprimer « ${s.name} » et ses ingrédients ?`)) return;
+    draft.sections = draft.sections.filter(x => x !== s);
+    renderIngredients();
+  }
 });
-ingredientList.addEventListener("input", e => {
-  if (e.target.matches(".qty-input")) draft.ingredients[Number(e.target.dataset.idx)].qty = e.target.value;
+ingSections.addEventListener("input", e => {
+  if (e.target.dataset.qty) { const f = findItem(e.target.dataset.qty); if (f) f.item.qty = e.target.value; }
+  if (e.target.matches(".ing-input")) updateAutocomplete(e.target);
+});
+ingSections.addEventListener("focusin", e => { if (e.target.matches(".ing-input")) updateAutocomplete(e.target); });
+ingSections.addEventListener("focusout", e => {
+  // On ne ferme que si le focus a vraiment quitté les champs d'ingrédients
+  if (e.target.matches(".ing-input")) setTimeout(() => {
+    const a = document.activeElement;
+    if (!a?.matches?.(".ing-input") && !acBox.contains(a)) closeAutocomplete();
+  }, 120);
+});
+ingSections.addEventListener("keydown", e => {
+  if (!e.target.matches(".ing-input")) return;
+  const input = e.target;
+  const open = !acBox.hidden && acItems.length;
+  if (e.key === "ArrowDown" && open) { e.preventDefault(); setActive((acActive + 1) % acItems.length); }
+  else if (e.key === "ArrowUp" && open) { e.preventDefault(); setActive((acActive - 1 + acItems.length) % acItems.length); }
+  else if (e.key === "Escape" && open) { e.preventDefault(); e.stopPropagation(); closeAutocomplete(); }
+  else if (e.key === "Enter") {
+    e.preventDefault();
+    if (open && acActive >= 0) submitTyped(input, acItems[acActive].name);
+    else submitTyped(input);
+  } else if (e.key === "Tab" && open && acActive >= 0 && input.value.trim()) {
+    e.preventDefault();
+    submitTyped(input, acItems[acActive].name);
+  }
 });
 qtyToggle.addEventListener("change", () => {
   renderIngredients();
-  if (qtyToggle.checked) ingredientList.querySelector(".qty-input")?.focus();
+  if (qtyToggle.checked) ingSections.querySelector(".qty-input")?.focus();
 });
 
-// Suggestions issues de l'analyse de la photo : à valider une par une
-function renderSuggestions() {
-  suggestionsBox.hidden = !draft.suggestions.length;
-  suggestionList.innerHTML = draft.suggestions.map((s, idx) => `
-    <li class="suggestion">
-      ${escapeHtml(s)}
-      <button type="button" class="ok" data-accept="${idx}" aria-label="Valider ${escapeHtml(s)}">${ICON_CHECK}</button>
-      <button type="button" class="no" data-reject="${idx}" aria-label="Retirer ${escapeHtml(s)}">${ICON_X}</button>
-    </li>`).join("");
+// ---------- Suggestions pendant la saisie ----------
+const acBox = document.createElement("ul");
+acBox.className = "ac-list";
+acBox.id = "acList";
+acBox.setAttribute("role", "listbox");
+acBox.hidden = true;
+let acItems = [], acActive = -1, acInput = null;
+
+function updateAutocomplete(input) {
+  const query = input.value;
+  // Pas de suggestion quand on tape une liste séparée par des virgules
+  if (query.includes(",") || query.trim().length < 2) return closeAutocomplete();
+  const section = draft.sections.find(s => s.id === input.dataset.sid);
+  acItems = suggestIngredients(query, {
+    history: ingredientHistory(),
+    exclude: draft.sections.flatMap(s => s.items.filter(x => !x.pending).map(x => x.name)),
+    preferCategory: section?.name ? categoryForSection(section.name) : null,
+  });
+  if (!acItems.length) return closeAutocomplete();
+  acInput = input;
+  input.parentElement.appendChild(acBox);
+  input.setAttribute("aria-expanded", "true");
+  input.setAttribute("aria-controls", "acList");
+  const q = normalizeText(query);
+  acBox.innerHTML = acItems.map((it, i) => {
+    // Met en gras la partie tapée quand elle est au début d'un mot
+    const n = normalizeText(it.name);
+    let at = n.startsWith(q) ? 0 : n.indexOf(" " + q) + 1;
+    if (!q || at < 0 || (at === 0 && !n.startsWith(q))) at = -1;
+    const label = at >= 0
+      ? escapeHtml(it.name.slice(0, at)) + "<strong>" + escapeHtml(it.name.slice(at, at + q.length)) + "</strong>" + escapeHtml(it.name.slice(at + q.length))
+      : escapeHtml(it.name);
+    const meta = it.uses ? "déjà utilisé" : (it.category || "");
+    return `<li role="option" id="ac-${i}" data-i="${i}"><span>${label}</span>${meta ? `<small>${escapeHtml(meta)}</small>` : ""}</li>`;
+  }).join("");
+  acBox.hidden = false;
+  // Le premier choix est présélectionné quand il commence par ce qui a été tapé
+  setActive(normalizeText(acItems[0].name).startsWith(normalizeText(singularize(query))) || normalizeText(acItems[0].name).startsWith(q) ? 0 : -1);
 }
-suggestionList.addEventListener("click", e => {
-  const accept = e.target.closest("[data-accept]");
-  const reject = e.target.closest("[data-reject]");
-  if (!accept && !reject) return;
-  const idx = Number((accept || reject).dataset[accept ? "accept" : "reject"]);
-  const [name] = draft.suggestions.splice(idx, 1);
-  if (accept) addIngredient(name);
-  renderSuggestions();
-  if (!draft.suggestions.length) analyzeStatus.textContent = "Toutes les suggestions ont été traitées.";
+function setActive(i) {
+  acActive = i;
+  [...acBox.children].forEach((li, j) => li.classList.toggle("active", j === i));
+  acInput?.setAttribute("aria-activedescendant", i >= 0 ? `ac-${i}` : "");
+  acBox.children[i]?.scrollIntoView({ block: "nearest" });
+}
+function closeAutocomplete() {
+  acBox.hidden = true;
+  acItems = []; acActive = -1;
+  acInput?.setAttribute("aria-expanded", "false");
+  acInput = null;
+}
+acBox.addEventListener("mousedown", e => {
+  const li = e.target.closest("li");
+  if (!li || !acInput) return;
+  e.preventDefault(); // garde le focus dans le champ
+  submitTyped(acInput, acItems[Number(li.dataset.i)].name);
+});
+acBox.addEventListener("mousemove", e => { const li = e.target.closest("li"); if (li) setActive(Number(li.dataset.i)); });
+
+// ---------- Sous-rubriques ----------
+function renderSectionChips() {
+  const used = new Set(draft.sections.map(s => normalizeText(s.name)));
+  sectionChips.innerHTML = SECTION_SUGGESTIONS.filter(n => !used.has(normalizeText(n)))
+    .map(n => `<button type="button" class="chip" data-section-name="${escapeHtml(n)}">${escapeHtml(n)}</button>`).join("") +
+    `<button type="button" class="chip add-chip" data-section-other>Autre…</button>`;
+}
+function addSection(name) {
+  name = capitalize(name.trim().slice(0, 40));
+  if (!name) return;
+  let section = draft.sections.find(s => normalizeText(s.name) === normalizeText(name));
+  if (!section) { section = { id: newId(), name, items: [] }; draft.sections.push(section); }
+  sectionChoices.hidden = true;
+  sectionOtherRow.hidden = true;
+  addSectionBtn.hidden = false;
+  renderIngredients(section.id);
+}
+addSectionBtn.addEventListener("click", () => {
+  sectionChoices.hidden = false;
+  addSectionBtn.hidden = true;
+  renderSectionChips();
+});
+sectionChips.addEventListener("click", e => {
+  const chip = e.target.closest(".chip");
+  if (!chip) return;
+  if (chip.hasAttribute("data-section-other")) {
+    sectionOtherRow.hidden = false;
+    sectionOther.value = "";
+    sectionOther.focus();
+  } else addSection(chip.dataset.sectionName);
+});
+document.getElementById("sectionOtherOk").addEventListener("click", () => addSection(sectionOther.value));
+sectionOther.addEventListener("keydown", e => {
+  if (e.key === "Enter") { e.preventDefault(); addSection(sectionOther.value); }
+  if (e.key === "Escape") { e.stopPropagation(); sectionChoices.hidden = true; addSectionBtn.hidden = false; }
 });
 
 // ---------- Analyse de la photo par Claude ----------
@@ -555,14 +792,15 @@ analyzeBtn.addEventListener("click", async () => {
       { images: [blob], modelTier: "default" }
     );
     if (blob !== draft.photoBlob) return; // la photo a changé entre-temps
-    const items = (Array.isArray(result) ? result : [])
+    // Retire les anciennes suggestions non validées, puis ajoute les nouvelles (au singulier)
+    draft.sections.forEach(sec => (sec.items = sec.items.filter(x => !x.pending)));
+    const added = (Array.isArray(result) ? result : [])
       .filter(x => typeof x === "string")
-      .map(x => x.trim().slice(0, 60))
-      .filter(x => x && !hasIngredient(x));
-    draft.suggestions = [...new Set(items)];
-    renderSuggestions();
-    updateAnalyzeState(draft.suggestions.length
-      ? `${draft.suggestions.length} suggestion${draft.suggestions.length > 1 ? "s" : ""} : valide celles qui sont justes.`
+      .map(x => addIngredient(mainSection().id, x, { pending: true }))
+      .filter(Boolean);
+    renderIngredients();
+    updateAnalyzeState(added.length
+      ? `${added.length} suggestion${added.length > 1 ? "s" : ""} ajoutée${added.length > 1 ? "s" : ""} à la liste : valide celles qui sont justes.`
       : "Aucun nouvel ingrédient repéré sur la photo.");
   } catch (e) {
     if (e?.code === "not_granted" || e?.code === "sampling_disabled") sampleState = "unavailable";
@@ -590,7 +828,8 @@ form.addEventListener("submit", e => {
   if (!form.date.value) form.date.value = iso(new Date());
 
   // Un ingrédient tapé mais pas encore ajouté est pris en compte
-  if (ingredientNew.value.trim()) ingredientNew.value.split(",").forEach(addIngredient);
+  ingSections.querySelectorAll(".ing-input").forEach(input =>
+    input.value.split(",").forEach(v => v.trim() && addIngredient(input.dataset.sid, v)));
 
   const type = form.type.value;
   const meal = {
@@ -604,7 +843,9 @@ form.addEventListener("submit", e => {
     preparedBy: preparedBy.value,
     preparer: preparedBy.value === "Moi" ? "" : draft.preparer,
     rating: draft.rating,
-    ingredients: draft.ingredients.map(i => ({ name: i.name, qty: qtyToggle.checked ? i.qty.trim() : i.qty })),
+    // Liste à plat ; « group » = nom de la sous-rubrique ("" pour la liste principale)
+    ingredients: draft.sections.flatMap(sec => sec.items.filter(i => !i.pending)
+      .map(i => ({ name: i.name, qty: i.qty.trim(), group: sec.name }))),
     recipeUrl,
     improve: form.improve.value.trim(),
   };
@@ -626,4 +867,5 @@ document.addEventListener("click", e => {
 // ---------- Lancement ----------
 function refresh() { renderCalendar(); renderRecent(); renderIdea(); }
 initSample();
+renderRecent();
 route();
