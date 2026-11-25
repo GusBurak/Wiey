@@ -343,6 +343,7 @@ h1, h2 { font-family: Fraunces, Georgia, serif; font-weight: 500; margin: 0; }
 }
 .field { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 0; }
 .field-row { display: flex; gap: 12px; }
+.field.date-field { max-width: 240px; }
 .field-label { font-size: 13px; font-weight: 600; }
 .field-error { color: #b3412e; font-size: 12px; }
 .field-error[hidden] { display: none; }

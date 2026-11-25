@@ -382,6 +382,8 @@ function openAddPage(meal) {
     if (draft.preparer && preparedBy.value !== "Moi" && !preparerList().includes(draft.preparer)) preparerList().push(draft.preparer);
   }
   renderPreparer();
+  renderTypeChips();
+  renderPreparedByChips();
   renderStars();
   closeSectionChooser();
   closeAutocomplete();
@@ -447,6 +449,36 @@ photoInput.addEventListener("change", () => {
   img.onerror = () => notify("Cette image n'a pas pu être lue.");
   img.src = URL.createObjectURL(file);
 });
+
+// ---------- Pastilles à cocher pour « Repas » et « Préparé par » ----------
+// Le <select> caché garde la valeur (le reste du code le lit) ; les pastilles le pilotent.
+function chipSelect(select, container) {
+  const render = () => {
+    container.innerHTML = [...select.options].map(o =>
+      `<button type="button" class="chip" role="radio" aria-checked="${o.value === select.value}" tabindex="${o.value === select.value ? 0 : -1}" data-value="${escapeHtml(o.value)}">${escapeHtml(o.text)}</button>`).join("");
+  };
+  const choose = value => {
+    if (value === select.value) return;
+    select.value = value;
+    select.dispatchEvent(new Event("change"));
+    render();
+    // Garde le focus sur la pastille, sauf si le changement l'a envoyé ailleurs (ex. champ du resto)
+    const a = document.activeElement;
+    if (!a || a === document.body || container.contains(a)) container.querySelector(`[data-value="${CSS.escape(value)}"]`)?.focus();
+  };
+  container.addEventListener("click", e => { const c = e.target.closest("[data-value]"); if (c) choose(c.dataset.value); });
+  container.addEventListener("keydown", e => {
+    const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key];
+    if (!step) return;
+    e.preventDefault();
+    const values = [...select.options].map(o => o.value);
+    choose(values[(values.indexOf(select.value) + step + values.length) % values.length]);
+  });
+  render();
+  return render; // à rappeler quand la valeur change par le code
+}
+const renderTypeChips = chipSelect(form.type, document.getElementById("typeChips"));
+const renderPreparedByChips = chipSelect(document.getElementById("preparedBy"), document.getElementById("preparedByChips"));
 
 // ---------- Moment du repas (déjeuner / dîner) ----------
 const courseField = document.getElementById("courseField");

@@ -134,20 +134,20 @@
               <input type="text" name="name" required placeholder="Ex. Salade de lentilles" autocomplete="off">
               <span class="field-error" id="nameError" hidden>Donne un nom à ce plat.</span>
             </label>
-            <div class="field-row">
-              <label class="field">
-                <span class="field-label">Date</span>
-                <input type="date" name="date" required>
-              </label>
-              <label class="field">
-                <span class="field-label">Repas</span>
-                <select name="type">
-                  <option>Petit-déjeuner</option>
-                  <option>Déjeuner</option>
-                  <option>Goûter</option>
-                  <option>Dîner</option>
-                </select>
-              </label>
+            <label class="field date-field">
+              <span class="field-label">Date</span>
+              <input type="date" name="date" required>
+            </label>
+            <!-- Repas : pastilles (le select caché garde la valeur) -->
+            <div class="inline-field">
+              <span class="field-label">Repas</span>
+              <select name="type" hidden>
+                <option>Petit-déjeuner</option>
+                <option>Déjeuner</option>
+                <option>Goûter</option>
+                <option>Dîner</option>
+              </select>
+              <div class="chip-list" id="typeChips" role="radiogroup" aria-label="Repas"></div>
             </div>
             <!-- Déjeuner / Dîner : quel moment du repas -->
             <div class="inline-field" id="courseField" hidden>
@@ -160,12 +160,13 @@
           <section class="field-block">
             <div class="inline-field">
               <span class="field-label">Préparé par</span>
-              <select name="preparedBy" id="preparedBy" class="tag-select">
+              <select name="preparedBy" id="preparedBy" hidden>
                 <option>Moi</option>
                 <option>Un proche</option>
                 <option>Un resto</option>
                 <option>Livraison</option>
               </select>
+              <div class="chip-list" id="preparedByChips" role="radiogroup" aria-label="Préparé par"></div>
             </div>
             <div class="picker" id="preparerPicker" hidden>
               <div class="chip-list" id="preparerChips" role="radiogroup"></div>
