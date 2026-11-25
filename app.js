@@ -3,7 +3,7 @@
 // Les données sont stockées dans le navigateur (localStorage).
 // =====================================================
 
-const KEYS = { meals: "wiey.meals", people: "wiey.people", restaurants: "wiey.restaurants" };
+const KEYS = { meals: "wiey.meals", people: "wiey.people", restaurants: "wiey.restaurants", restaurantInfo: "wiey.restaurantInfo" };
 const MEAL_TYPES = ["Petit-déjeuner", "Déjeuner", "Goûter", "Dîner"];
 const TYPE_EMOJI = { "Petit-déjeuner": "🥐", "Déjeuner": "🥗", "Goûter": "🍎", "Dîner": "🍝" };
 const COURSES = ["Apéritif", "Entrée", "Plat", "Dessert"];
@@ -26,6 +26,7 @@ function save(key, value) {
 let meals = load(KEYS.meals, () => []);
 let people = load(KEYS.people, () => []);
 let restaurants = load(KEYS.restaurants, () => []);
+let restaurantInfo = load(KEYS.restaurantInfo, () => ({})); // nom du resto → adresse
 const saveMeals = () => save(KEYS.meals, meals);
 
 // Nettoyage unique : retire les repas d'exemple (identifiants « demo-… ») et les
@@ -197,6 +198,7 @@ function openDetail(id) {
       ${prepared ? `<span class="tag neutral">${escapeHtml(prepared)}</span>` : ""}
       ${meal.rating ? `<span class="tag neutral detail-stars" aria-label="${formatRating(meal.rating)}">${starsHtml(meal.rating, "mini")}<span>${formatRating(meal.rating)}</span></span>` : ""}
     </div>
+    ${meal.preparedBy === "Un resto" && meal.preparerAddress ? `<div class="detail-section"><h3>Restaurant</h3><p>${escapeHtml(meal.preparer)} · <span class="muted-text">${escapeHtml(meal.preparerAddress)}</span></p></div>` : ""}
     ${ingredientsDetailHtml(ingredients)}
     ${meal.recipeUrl && isWebLink(meal.recipeUrl) ? `<div class="detail-section"><h3>Recette</h3><p><a href="${escapeHtml(meal.recipeUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(meal.recipeUrl)}</a></p></div>` : ""}
     ${meal.improve ? `<div class="detail-section"><h3>À améliorer</h3><p>${escapeHtml(meal.improve)}</p></div>` : ""}
@@ -294,7 +296,7 @@ const sectionOther = document.getElementById("sectionOther");
 // État du formulaire en cours
 let draft;
 function resetDraft() {
-  draft = { photo: null, photoBlob: null, preparer: "", rating: 0, sections: [{ id: newId(), name: "", items: [] }], course: "Plat" };
+  draft = { photo: null, photoBlob: null, preparer: "", rating: 0, sections: [{ id: newId(), name: "", items: [] }], course: "Plat", preparerAddress: "" };
 }
 
 function openAddPage() {
@@ -307,6 +309,10 @@ function openAddPage() {
   photoDrop.classList.remove("has-photo");
   document.querySelectorAll(".add-form .invalid").forEach(el => el.classList.remove("invalid"));
   document.querySelectorAll(".field-error").forEach(el => (el.hidden = true));
+  preparerAddRow.hidden = true;
+  preparerNew.value = "";
+  closePlaceList();
+  lastRemote = { query: "", results: [], status: "" };
   renderPreparer();
   renderStars();
   closeSectionChooser();
@@ -376,26 +382,31 @@ courseChips.addEventListener("keydown", e => {
 
 // ---------- Préparé par ----------
 function preparerList() { return preparedBy.value === "Un proche" ? people : restaurants; }
+const isResto = () => preparedBy.value === "Un resto";
 
 function renderPreparer() {
   const mode = preparedBy.value;
   preparerPicker.hidden = mode === "Moi";
-  if (mode === "Moi") { draft.preparer = ""; return; }
+  if (mode === "Moi") { draft.preparer = ""; draft.preparerAddress = ""; return; }
   const list = preparerList();
-  const addLabel = mode === "Un proche" ? "Ajouter un proche" : "Ajouter un restaurant";
   if (draft.preparer && !list.includes(draft.preparer)) draft.preparer = "";
   preparerChips.innerHTML =
     list.map(n => `<button type="button" class="chip" role="radio" aria-checked="${n === draft.preparer}" data-name="${escapeHtml(n)}">${escapeHtml(n)}</button>`).join("") +
-    `<button type="button" class="chip add-chip" data-add>+ ${addLabel}</button>`;
-  preparerNew.placeholder = mode === "Un proche" ? "Prénom du proche" : "Nom du restaurant";
+    (isResto() ? "" : `<button type="button" class="chip add-chip" data-add>+ Ajouter un proche</button>`);
+  // Pour un resto, le champ de recherche est toujours visible
+  if (isResto()) preparerAddRow.hidden = false;
+  preparerNew.placeholder = isResto() ? "Rechercher un restaurant…" : "Prénom du proche";
+  preparerNewOk.textContent = isResto() ? "Ajouter" : "Ajouter";
 }
 
 preparedBy.addEventListener("change", () => {
   draft.preparer = "";
+  draft.preparerAddress = "";
   preparerAddRow.hidden = true;
+  closePlaceList();
   renderPreparer();
-  // Pas encore de proche / resto enregistré : on ouvre directement la saisie
-  if (preparedBy.value !== "Moi" && !preparerList().length) showPreparerInput();
+  // Pas encore de proche enregistré, ou mode resto : on ouvre directement la saisie
+  if (preparedBy.value !== "Moi" && (isResto() || !preparerList().length)) showPreparerInput();
 });
 
 preparerChips.addEventListener("click", e => {
@@ -403,6 +414,7 @@ preparerChips.addEventListener("click", e => {
   if (!chip) return;
   if (chip.hasAttribute("data-add")) { showPreparerInput(); return; }
   draft.preparer = draft.preparer === chip.dataset.name ? "" : chip.dataset.name;
+  draft.preparerAddress = draft.preparer ? (restaurantInfo[draft.preparer] || "") : "";
   renderPreparer();
 });
 
@@ -412,25 +424,223 @@ function showPreparerInput() {
   preparerNew.focus();
 }
 
-function addPreparer() {
-  const name = preparerNew.value.trim();
+function addPreparer(name = preparerNew.value.trim(), address = "") {
+  name = String(name).trim().slice(0, 80);
   if (!name) { preparerNew.focus(); return; }
   const list = preparerList();
   const existing = list.find(n => n.toLowerCase() === name.toLowerCase());
   if (!existing) {
     list.push(name);
     list.sort((a, b) => a.localeCompare(b, "fr"));
-    save(preparedBy.value === "Un proche" ? KEYS.people : KEYS.restaurants, list);
+    save(isResto() ? KEYS.restaurants : KEYS.people, list);
   }
   draft.preparer = existing || name;
-  preparerAddRow.hidden = true;
+  if (isResto()) {
+    if (address) { restaurantInfo[draft.preparer] = address; save(KEYS.restaurantInfo, restaurantInfo); }
+    draft.preparerAddress = restaurantInfo[draft.preparer] || "";
+  }
+  preparerNew.value = "";
+  closePlaceList();
+  if (!isResto()) preparerAddRow.hidden = true;
   renderPreparer();
 }
-document.getElementById("preparerNewOk").addEventListener("click", addPreparer);
+const preparerNewOk = document.getElementById("preparerNewOk");
+preparerNewOk.addEventListener("click", () => addPreparer());
 preparerNew.addEventListener("keydown", e => {
-  if (e.key === "Enter") { e.preventDefault(); addPreparer(); }
-  if (e.key === "Escape") { e.stopPropagation(); preparerAddRow.hidden = true; }
+  const open = !placeBox.hidden && placeItems.length;
+  if (e.key === "ArrowDown" && open) { e.preventDefault(); setPlaceActive((placeActive + 1) % placeItems.length); }
+  else if (e.key === "ArrowUp" && open) { e.preventDefault(); setPlaceActive((placeActive - 1 + placeItems.length) % placeItems.length); }
+  else if (e.key === "Enter") {
+    e.preventDefault();
+    if (open && placeActive >= 0) choosePlace(placeItems[placeActive]);
+    else addPreparer();
+  } else if (e.key === "Escape") {
+    e.stopPropagation();
+    if (!placeBox.hidden) closePlaceList();
+    else if (!isResto()) preparerAddRow.hidden = true;
+  }
 });
+preparerNew.addEventListener("input", onPlaceInput);
+preparerNew.addEventListener("blur", () => setTimeout(() => { if (document.activeElement !== preparerNew) closePlaceList(); }, 150));
+
+// ---------- Suggestions pendant la saisie d'un nom (proche ou resto) ----------
+// 1) les noms déjà enregistrés ; 2) pour un resto, les lieux trouvés par Mapbox
+const PLACES_SERVER = "Mapbox";
+const PLACE_TOOLS = ["search_and_geocode_tool", "poi_search_tool", "forward_geocode_tool"];
+let mcpApi = null;
+let placeTool = null, placeSchema = null;
+let placeProblem = null;            // erreur durable (connecteur absent, refusé…)
+let placeItems = [], placeActive = -1, placeTimer = null, placeSeq = 0;
+let lastRemote = { query: "", results: [], status: "" };
+
+const placeBox = document.createElement("ul");
+placeBox.className = "ac-list place-list";
+placeBox.id = "placeList";
+placeBox.setAttribute("role", "listbox");
+placeBox.hidden = true;
+preparerAddRow.appendChild(placeBox);
+preparerNew.setAttribute("role", "combobox");
+preparerNew.setAttribute("aria-controls", "placeList");
+preparerNew.setAttribute("aria-autocomplete", "list");
+
+async function initPlaces() {
+  try { mcpApi = window.claude?.use ? await window.claude.use("mcp") : null; }
+  catch (e) { mcpApi = null; }
+}
+
+const PLACE_ERRORS = {
+  server_not_connected: "Pour des suggestions de lieux, connecte Mapbox dans claude.ai (Réglages → Connecteurs).",
+  needs_reauth: "Reconnecte Mapbox dans claude.ai (Réglages → Connecteurs) pour retrouver les suggestions de lieux.",
+  selection_required: "Choisis quel connecteur Mapbox utiliser dans la fenêtre proposée par Claude.",
+  not_in_manifest: "Mapbox n'est pas autorisé pour ce site : tu peux l'activer dans les permissions de la page.",
+  approval_required: "Les suggestions Mapbox demandent ton autorisation.",
+  blocked_by_policy: "Mapbox est bloqué par ton organisation.",
+  no_tool: "Le connecteur Mapbox ne propose pas de recherche de lieux.",
+};
+const DURABLE = ["server_not_connected", "needs_reauth", "not_in_manifest", "blocked_by_policy", "no_tool", "not_granted", "capability_disabled", "capability_removed"];
+
+function onPlaceInput() {
+  const q = preparerNew.value.trim();
+  clearTimeout(placeTimer);
+  if (q.length < 2) { lastRemote = { query: "", results: [], status: "" }; return closePlaceList(); }
+  const remote = isResto() && mcpApi && !placeProblem && q.length >= 3;
+  if (remote && lastRemote.query !== q) {
+    lastRemote = { query: q, results: lastRemote.results, status: "loading" };
+    placeTimer = setTimeout(() => searchPlaces(q), 350);
+  }
+  renderPlaceList();
+}
+
+async function searchPlaces(q) {
+  const seq = ++placeSeq;
+  try {
+    if (!placeTool) {
+      const res = await mcpApi.listTools(PLACES_SERVER);
+      const srv = res.servers.find(s => s.server === PLACES_SERVER);
+      if (!srv || !srv.tools.length) throw { code: "server_not_connected" };
+      const names = srv.tools.map(t => t.name);
+      placeTool = PLACE_TOOLS.find(n => names.includes(n));
+      if (!placeTool) throw { code: "no_tool" };
+    }
+    if (!placeSchema) placeSchema = await mcpApi.describeTool(PLACES_SERVER, placeTool).then(d => d.inputSchema).catch(() => null);
+    const result = await mcpApi.callTool(PLACES_SERVER, placeTool, buildPlaceInput(q), { cache: { staleTime: 60000, gcTime: 600000 } });
+    // Le schéma devient lisible après la première autorisation : on le relit pour les recherches suivantes
+    if (!placeSchema) placeSchema = await mcpApi.describeTool(PLACES_SERVER, placeTool).then(d => d.inputSchema).catch(() => null);
+    if (seq !== placeSeq) return;
+    lastRemote = { query: q, results: parsePlaces(result).slice(0, 5), status: "done" };
+  } catch (e) {
+    if (seq !== placeSeq) return;
+    const code = e?.code || "upstream_error";
+    if (DURABLE.includes(code)) placeProblem = code;
+    lastRemote = { query: q, results: [], status: "error:" + code };
+  }
+  if (preparerNew.value.trim() === q) renderPlaceList();
+}
+
+// Construit la requête d'après le schéma du connecteur (lu à l'exécution)
+function buildPlaceInput(q) {
+  const props = (placeSchema && placeSchema.properties) || {};
+  const has = k => Object.prototype.hasOwnProperty.call(props, k);
+  const mentions = (k, word) => JSON.stringify(props[k] || "").includes(word);
+  const qKey = ["q", "query", "searchText", "search_text", "text"].find(has) || "q";
+  const input = { [qKey]: q };
+  if (has("limit")) input.limit = 5;
+  if (has("language")) input.language = "fr";
+  if (has("types") && mentions("types", '"poi"')) input.types = ["poi"];
+  if (has("format") && mentions("format", "json_string")) input.format = "json_string";
+  if (has("auto_complete")) input.auto_complete = true;
+  return input;
+}
+
+// Lit la réponse, qu'elle soit en GeoJSON, en liste ou en texte
+function parsePlaces(result) {
+  let data = result?.payload;
+  if (data == null) data = (result?.content || []).filter(b => b.type === "text").map(b => b.text).join("\n");
+  if (typeof data === "string") { try { data = JSON.parse(data); } catch (e) { /* texte libre */ } }
+  const list = Array.isArray(data) ? data : (data?.features || data?.results || data?.suggestions || data?.places);
+  let out = [];
+  if (Array.isArray(list)) {
+    out = list.map(f => {
+      const p = f?.properties || f || {};
+      const name = p.name || p.name_preferred || p.text || p.title || (p.place_name || "").split(",")[0];
+      const address = p.full_address || p.place_formatted || p.address || p.place_name || "";
+      return { name: String(name || "").trim(), address: String(address || "").trim() };
+    });
+  } else if (typeof data === "string") {
+    // Texte : « 1. Nom » puis une ligne d'adresse
+    const lines = data.split("\n").map(l => l.trim()).filter(Boolean);
+    lines.forEach((l, i) => {
+      const m = l.match(/^\d+[.)]\s*\**(.+?)\**$/);
+      if (!m) return;
+      const next = lines[i + 1] || "";
+      const addr = /^\d+[.)]/.test(next) ? "" : next.replace(/^(address|adresse|full address)\s*:\s*/i, "");
+      out.push({ name: m[1].trim(), address: addr });
+    });
+  }
+  const seen = new Set();
+  return out.filter(p => {
+    if (!p.name) return false;
+    if (p.address.toLowerCase().startsWith(p.name.toLowerCase() + ",")) p.address = p.address.slice(p.name.length + 1).trim();
+    const key = normalizeText(p.name + "|" + p.address);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function renderPlaceList() {
+  const q = preparerNew.value.trim();
+  const nq = normalizeText(q);
+  const saved = preparerList()
+    .filter(n => normalizeText(n).includes(nq) && normalizeText(n) !== "")
+    .sort((a, b) => normalizeText(a).indexOf(nq) - normalizeText(b).indexOf(nq))
+    .slice(0, 4)
+    .map(n => ({ name: n, address: isResto() ? (restaurantInfo[n] || "") : "", saved: true }));
+  const savedKeys = new Set(saved.map(s => normalizeText(s.name)));
+  const remote = (lastRemote.query && isResto() ? lastRemote.results : [])
+    .filter(r => !savedKeys.has(normalizeText(r.name)));
+  placeItems = [...saved, ...remote];
+
+  let status = "";
+  if (isResto() && q.length >= 3) {
+    if (!mcpApi) status = "";
+    else if (placeProblem) status = PLACE_ERRORS[placeProblem] || "";
+    else if (lastRemote.status === "loading") status = "Recherche sur Mapbox…";
+    else if (lastRemote.status.startsWith("error:")) status = PLACE_ERRORS[lastRemote.status.slice(6)] || "Suggestions Mapbox indisponibles pour le moment.";
+    else if (lastRemote.status === "done" && !remote.length && !saved.length) status = "Aucun lieu trouvé sur Mapbox.";
+  }
+  if (!placeItems.length && !status) return closePlaceList();
+
+  const row = (p, i) => `<li role="option" id="pl-${i}" data-i="${i}">
+      <span class="place-main"><span>${escapeHtml(p.name)}</span>${p.address ? `<small class="place-addr">${escapeHtml(p.address)}</small>` : ""}</span>
+      ${p.saved ? `<small>déjà enregistré</small>` : ""}
+    </li>`;
+  let html = saved.map((p, i) => row(p, i)).join("");
+  if (remote.length) html += `<li class="ac-head" role="presentation">Suggestions Mapbox</li>` + remote.map((p, j) => row(p, saved.length + j)).join("");
+  if (status) html += `<li class="ac-status" role="presentation">${escapeHtml(status)}</li>`;
+  placeBox.innerHTML = html;
+  placeBox.hidden = false;
+  preparerNew.setAttribute("aria-expanded", "true");
+  setPlaceActive(placeItems.length && normalizeText(placeItems[0].name).startsWith(nq) ? 0 : -1);
+}
+function setPlaceActive(i) {
+  placeActive = i;
+  placeBox.querySelectorAll("li[data-i]").forEach(li => li.classList.toggle("active", Number(li.dataset.i) === i));
+  preparerNew.setAttribute("aria-activedescendant", i >= 0 ? `pl-${i}` : "");
+}
+function closePlaceList() {
+  placeBox.hidden = true;
+  placeItems = []; placeActive = -1;
+  preparerNew.setAttribute("aria-expanded", "false");
+}
+function choosePlace(p) { addPreparer(p.name, p.address); }
+placeBox.addEventListener("mousedown", e => {
+  const li = e.target.closest("li[data-i]");
+  if (!li) return;
+  e.preventDefault();
+  choosePlace(placeItems[Number(li.dataset.i)]);
+});
+placeBox.addEventListener("mousemove", e => { const li = e.target.closest("li[data-i]"); if (li) setPlaceActive(Number(li.dataset.i)); });
 
 // ---------- Note sur 5 (demi-étoiles possibles) ----------
 function starsHtml(rating, cls = "") {
@@ -1034,6 +1244,7 @@ form.addEventListener("submit", e => {
     color: null,
     preparedBy: preparedBy.value,
     preparer: preparedBy.value === "Moi" ? "" : draft.preparer,
+    preparerAddress: preparedBy.value === "Un resto" && draft.preparer ? (restaurantInfo[draft.preparer] || "") : "",
     rating: draft.rating,
     // Liste à plat ; « group » = nom de la sous-rubrique ("" pour la liste principale)
     ingredients: draft.sections.flatMap(sec => sec.items.filter(i => !i.pending)
@@ -1060,5 +1271,6 @@ document.addEventListener("click", e => {
 // ---------- Lancement ----------
 function refresh() { renderCalendar(); renderRecent(); renderIdea(); }
 initSample();
+initPlaces();
 renderRecent();
 route();

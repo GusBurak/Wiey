@@ -487,6 +487,14 @@ h1, h2 { font-family: Fraunces, Georgia, serif; font-weight: 500; margin: 0; }
 .ac-list li.active { background: var(--hover); }
 .ac-list strong { font-weight: 700; }
 .ac-list small { color: var(--muted); font-size: 11px; white-space: nowrap; }
+.ac-list li.ac-head {
+  cursor: default; padding: 8px 10px 3px; font-size: 11px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: .04em; color: var(--muted);
+}
+.ac-list li.ac-status { cursor: default; font-size: 12px; color: var(--muted); line-height: 1.4; }
+.place-main { display: flex; flex-direction: column; min-width: 0; }
+.ac-list small.place-addr { white-space: normal; font-size: 12px; }
+.muted-text { color: var(--muted); }
 
 .section-adder { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
 .section-adder .chip[hidden], .section-choices[hidden] { display: none; }
