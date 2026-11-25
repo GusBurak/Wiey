@@ -6,6 +6,8 @@
 const KEYS = { meals: "wiey.meals", people: "wiey.people", restaurants: "wiey.restaurants" };
 const MEAL_TYPES = ["Petit-déjeuner", "Déjeuner", "Goûter", "Dîner"];
 const TYPE_EMOJI = { "Petit-déjeuner": "🥐", "Déjeuner": "🥗", "Goûter": "🍎", "Dîner": "🍝" };
+const COURSES = ["Apéritif", "Entrée", "Plat", "Dessert"];
+const COURSE_MEALS = ["Déjeuner", "Dîner"]; // repas pour lesquels on précise le moment
 const RATING_LABELS = ["", "Bof", "Moyen", "Bon", "Très bon", "Excellent"];
 
 // ---------- Stockage ----------
@@ -60,8 +62,10 @@ function photoBg(meal) {
   return meal.photo ? "transparent" : (meal.color || "var(--accent-soft)");
 }
 function sortByMoment(a, b) {
-  return MEAL_TYPES.indexOf(a.type) - MEAL_TYPES.indexOf(b.type);
+  const courseIdx = m => (m.course ? COURSES.indexOf(m.course) : 2);
+  return MEAL_TYPES.indexOf(a.type) - MEAL_TYPES.indexOf(b.type) || courseIdx(a) - courseIdx(b);
 }
+function mealMoment(meal) { return meal.course ? `${meal.type} · ${meal.course}` : meal.type; }
 function preparedLabel(meal) {
   if (!meal.preparedBy) return "";
   if (meal.preparedBy === "Moi") return "Fait maison";
@@ -137,7 +141,7 @@ function renderCalendar() {
       <span class="day-num">${dayNum}</span>
       <div class="thumbs">
         ${dayMeals.map(meal => `
-          <button class="thumb" data-id="${escapeHtml(meal.id)}" style="background:${photoBg(meal)}" aria-label="${escapeHtml(meal.type + " : " + meal.name)}">
+          <button class="thumb" data-id="${escapeHtml(meal.id)}" style="background:${photoBg(meal)}" aria-label="${escapeHtml(mealMoment(meal) + " : " + meal.name)}">
             ${photoHtml(meal)}
           </button>`).join("")}
       </div>
@@ -159,7 +163,7 @@ function showPreview(thumb) {
   const stars = meal.rating ? ` · ★ ${meal.rating.toLocaleString("fr-FR")}` : "";
   preview.innerHTML = `
     <div class="preview-photo" style="background:${photoBg(meal)}">${photoHtml(meal)}</div>
-    <div class="preview-info"><strong>${escapeHtml(meal.name)}</strong><span>${meal.type} · ${formatDate(meal.date)}${stars}</span></div>`;
+    <div class="preview-info"><strong>${escapeHtml(meal.name)}</strong><span>${escapeHtml(mealMoment(meal))} · ${formatDate(meal.date)}${stars}</span></div>`;
 
   // Aperçu centré à l'écran
   preview.style.left = "50%";
@@ -188,7 +192,7 @@ function openDetail(id) {
     <div class="detail-photo" style="background:${photoBg(meal)}">${photoHtml(meal)}</div>
     <h2 class="modal-title" style="margin-bottom:0">${escapeHtml(meal.name)}</h2>
     <div class="detail-meta">
-      <span class="tag">${meal.type}</span>
+      <span class="tag">${escapeHtml(mealMoment(meal))}</span>
       <span class="tag neutral">${formatDate(meal.date)}</span>
       ${prepared ? `<span class="tag neutral">${escapeHtml(prepared)}</span>` : ""}
       ${meal.rating ? `<span class="tag neutral detail-stars" aria-label="${formatRating(meal.rating)}">${starsHtml(meal.rating, "mini")}<span>${formatRating(meal.rating)}</span></span>` : ""}
@@ -247,7 +251,7 @@ function renderIdea() {
     <div class="idea-photo" style="background:${photoBg(pick)}">${photoHtml(pick)}</div>
     <div class="idea-text">
       <strong>${escapeHtml(pick.name)}</strong>
-      <span>${pick.type} · dernière fois ${formatDate(lastTime)}</span>
+      <span>${escapeHtml(mealMoment(pick))} · dernière fois ${formatDate(lastTime)}</span>
     </div>`;
 }
 document.getElementById("nextIdea").onclick = renderIdea;
@@ -290,7 +294,7 @@ const sectionOther = document.getElementById("sectionOther");
 // État du formulaire en cours
 let draft;
 function resetDraft() {
-  draft = { photo: null, photoBlob: null, preparer: "", rating: 0, sections: [{ id: newId(), name: "", items: [] }] };
+  draft = { photo: null, photoBlob: null, preparer: "", rating: 0, sections: [{ id: newId(), name: "", items: [] }], course: "Plat" };
 }
 
 function openAddPage() {
@@ -298,6 +302,7 @@ function openAddPage() {
   form.reset();
   form.date.value = iso(new Date());
   form.type.value = guessMealType();
+  renderCourse();
   photoDrop.style.backgroundImage = "";
   photoDrop.classList.remove("has-photo");
   document.querySelectorAll(".add-form .invalid").forEach(el => el.classList.remove("invalid"));
@@ -342,6 +347,31 @@ photoInput.addEventListener("change", () => {
   };
   img.onerror = () => alert("Cette image n'a pas pu être lue.");
   img.src = URL.createObjectURL(file);
+});
+
+// ---------- Moment du repas (déjeuner / dîner) ----------
+const courseField = document.getElementById("courseField");
+const courseChips = document.getElementById("courseChips");
+function renderCourse() {
+  courseField.hidden = !COURSE_MEALS.includes(form.type.value);
+  courseChips.innerHTML = COURSES.map(c =>
+    `<button type="button" class="chip" role="radio" aria-checked="${c === draft.course}" data-course="${c}">${c}</button>`).join("");
+}
+form.type.addEventListener("change", renderCourse);
+courseChips.addEventListener("click", e => {
+  const chip = e.target.closest("[data-course]");
+  if (!chip) return;
+  draft.course = chip.dataset.course;
+  renderCourse();
+  courseChips.querySelector(`[data-course="${draft.course}"]`).focus();
+});
+courseChips.addEventListener("keydown", e => {
+  const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key];
+  if (!step) return;
+  e.preventDefault();
+  draft.course = COURSES[(COURSES.indexOf(draft.course) + step + COURSES.length) % COURSES.length];
+  renderCourse();
+  courseChips.querySelector(`[data-course="${draft.course}"]`).focus();
 });
 
 // ---------- Préparé par ----------
@@ -998,6 +1028,7 @@ form.addEventListener("submit", e => {
     name,
     date: form.date.value,
     type,
+    course: COURSE_MEALS.includes(type) ? draft.course : "",
     photo: draft.photo,
     emoji: TYPE_EMOJI[type],
     color: null,
