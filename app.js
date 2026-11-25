@@ -324,6 +324,7 @@ function openAddPage() {
   renderStars();
   closeSectionChooser();
   closeAutocomplete();
+  renamingId = null;
   renderIngredients();
   updateAnalyzeState();
 }
@@ -567,50 +568,127 @@ function moveItem(itemId, targetSid) {
   const firstPending = target.items.findIndex(x => x.pending);
   target.items.splice(firstPending < 0 ? target.items.length : firstPending, 0, found.item);
   justAdded.add(found.item.id);
+  if (target !== mainSection() && !target.open) flashIds.add(target.id);
+}
+
+const ICON_PEN = `<svg viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16z M13.5 6.5l4 4"/></svg>`;
+let renamingId = null; // sous-rubrique dont le nom est en cours de modification
+
+function itemRowHtml(it, s, showQty) {
+  return `
+    <li class="ingredient${it.pending ? " pending" : ""}${justAdded.has(it.id) ? " entering" : ""}${flashIds.has(it.id) ? " flash" : ""}" data-iid="${it.id}">
+      ${it.pending ? `<span class="pending-mark" title="Suggestion de l'analyse photo">✨</span>` : ""}
+      <span class="ingredient-name">${escapeHtml(it.name)}</span>
+      ${it.pending ? `
+        <button type="button" class="round-btn ok" data-accept="${it.id}" aria-label="Valider ${escapeHtml(it.name)}">${ICON_CHECK}</button>
+        <button type="button" class="round-btn no" data-remove="${it.id}" aria-label="Retirer ${escapeHtml(it.name)}">${ICON_X}</button>`
+      : `
+        ${rubricSelectHtml(it, s)}
+        ${showQty ? `<input type="text" class="qty-input" data-qty="${it.id}" value="${escapeHtml(it.qty)}" placeholder="Ex. 200 g" aria-label="Quantité de ${escapeHtml(it.name)}">` : (it.qty ? `<span class="qty-text">${escapeHtml(it.qty)}</span>` : "")}
+        <button type="button" class="round-btn no" data-remove="${it.id}" aria-label="Retirer ${escapeHtml(it.name)}">${ICON_X}</button>`}
+    </li>`;
+}
+
+// Nom d'une sous-rubrique : texte + crayon, ou champ de saisie pendant la modification
+function sectionNameHtml(s) {
+  if (renamingId === s.id) {
+    return `<input type="text" class="rename-input" data-rename="${s.id}" value="${escapeHtml(s.name)}" maxlength="40" aria-label="Nouveau nom de la sous-rubrique">`;
+  }
+  return `<span class="section-title">
+      <span class="ing-section-name">${escapeHtml(s.name)}</span>
+      <button type="button" class="pen-btn" data-rename-section="${s.id}" aria-label="Renommer ${escapeHtml(s.name)}" title="Renommer">${ICON_PEN}</button>
+    </span>`;
+}
+
+// Sous-rubrique terminée : une ligne dans la liste, ses ingrédients en petit dessous
+function groupRowHtml(s) {
+  const items = s.items.filter(x => !x.pending);
+  const detail = items.length
+    ? items.map(i => escapeHtml(i.name) + (i.qty ? ` <span class="qty-text">(${escapeHtml(i.qty)})</span>` : "")).join(" · ")
+    : "Aucun ingrédient";
+  return `
+    <li class="ingredient group-row${justAdded.has(s.id) ? " entering" : ""}${flashIds.has(s.id) ? " flash" : ""}" data-gid="${s.id}">
+      <div class="group-body">
+        ${sectionNameHtml(s)}
+        <span class="group-items">${detail}</span>
+      </div>
+      <button type="button" class="text-btn" data-open-section="${s.id}">Modifier</button>
+      <button type="button" class="round-btn no" data-remove-section="${s.id}" aria-label="Supprimer la sous-rubrique ${escapeHtml(s.name)}">${ICON_X}</button>
+    </li>`;
 }
 
 function renderIngredients(focusSectionId) {
   const showQty = qtyToggle.checked;
-  ingSections.innerHTML = draft.sections.map((s, sIdx) => {
-    const pendingCount = s.items.filter(x => x.pending).length;
-    return `
-    <div class="ing-section${sIdx ? " sub" : ""}" data-sid="${s.id}">
-      ${sIdx ? `<div class="ing-section-head">
-        <span class="ing-section-name">${escapeHtml(s.name)}</span>
-        <span class="ing-section-actions">
-          ${s.open
-            ? `<button type="button" class="text-btn" data-close-section="${s.id}">${ICON_CHECK} Terminé</button>`
-            : `<button type="button" class="text-btn" data-open-section="${s.id}">+ Ajouter</button>`}
-          <button type="button" class="remove-btn" data-remove-section="${s.id}" aria-label="Supprimer la sous-rubrique ${escapeHtml(s.name)}">${ICON_X}</button>
-        </span>
-      </div>` : ""}
+  const main = mainSection();
+  const subs = draft.sections.slice(1);
+  const closed = subs.filter(x => !x.open);
+  const open = subs.filter(x => x.open);
+  const validated = main.items.filter(x => !x.pending);
+  const pending = main.items.filter(x => x.pending);
+  const pendingCount = pending.length;
+
+  // Liste principale : ingrédients, puis sous-rubriques terminées, puis suggestions à valider
+  const mainHtml = `
+    <div class="ing-section" data-sid="${main.id}">
       <ul class="ingredient-list">
-        ${s.items.map(it => `
-        <li class="ingredient${it.pending ? " pending" : ""}${justAdded.has(it.id) ? " entering" : ""}${flashIds.has(it.id) ? " flash" : ""}" data-iid="${it.id}">
-          ${it.pending ? `<span class="pending-mark" title="Suggestion de l'analyse photo">✨</span>` : ""}
-          <span class="ingredient-name">${escapeHtml(it.name)}</span>
-          ${it.pending ? `
-            <button type="button" class="round-btn ok" data-accept="${it.id}" aria-label="Valider ${escapeHtml(it.name)}">${ICON_CHECK}</button>
-            <button type="button" class="round-btn no" data-remove="${it.id}" aria-label="Retirer ${escapeHtml(it.name)}">${ICON_X}</button>`
-          : `
-            ${rubricSelectHtml(it, s)}
-            ${showQty ? `<input type="text" class="qty-input" data-qty="${it.id}" value="${escapeHtml(it.qty)}" placeholder="Ex. 200 g" aria-label="Quantité de ${escapeHtml(it.name)}">` : (it.qty ? `<span class="qty-text">${escapeHtml(it.qty)}</span>` : "")}
-            <button type="button" class="round-btn no" data-remove="${it.id}" aria-label="Retirer ${escapeHtml(it.name)}">${ICON_X}</button>`}
-        </li>`).join("")}
+        ${validated.map(it => itemRowHtml(it, main, showQty)).join("")}
+        ${closed.map(groupRowHtml).join("")}
+        ${pending.map(it => itemRowHtml(it, main, showQty)).join("")}
       </ul>
       ${pendingCount ? `<p class="hint">✨ ${pendingCount} suggestion${pendingCount > 1 ? "s" : ""} de l'analyse à valider (✓) ou retirer (✕). Celles non validées ne seront pas enregistrées.</p>` : ""}
-      ${sIdx && !s.open && !s.items.length ? `<p class="hint">Aucun ingrédient pour l'instant.</p>` : ""}
-      ${!sIdx || s.open ? `<div class="add-inline ac-wrap">
-        <input type="text" class="ing-input" data-sid="${s.id}" placeholder="${sIdx ? `Ajouter dans « ${escapeHtml(s.name)} »…` : "Ajouter un ingrédient…"}" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false">
-        <button type="button" class="small-btn" data-add-to="${s.id}">Ajouter</button>
-      </div>` : ""}
+      <div class="add-inline ac-wrap">
+        <input type="text" class="ing-input" data-sid="${main.id}" placeholder="Ajouter un ingrédient…" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false">
+        <button type="button" class="small-btn" data-add-to="${main.id}">Ajouter</button>
+      </div>
     </div>`;
-  }).join("");
+
+  // Sous-rubriques en cours de remplissage
+  const openHtml = open.map(s => `
+    <div class="ing-section sub" data-sid="${s.id}">
+      <div class="ing-section-head">
+        ${sectionNameHtml(s)}
+        <span class="ing-section-actions">
+          <button type="button" class="text-btn" data-close-section="${s.id}">${ICON_CHECK} Terminé</button>
+          <button type="button" class="remove-btn" data-remove-section="${s.id}" aria-label="Supprimer la sous-rubrique ${escapeHtml(s.name)}">${ICON_X}</button>
+        </span>
+      </div>
+      <ul class="ingredient-list">${s.items.map(it => itemRowHtml(it, s, showQty)).join("")}</ul>
+      <div class="add-inline ac-wrap">
+        <input type="text" class="ing-input" data-sid="${s.id}" placeholder="Ajouter dans « ${escapeHtml(s.name)} »…" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false">
+        <button type="button" class="small-btn" data-add-to="${s.id}">Ajouter</button>
+      </div>
+    </div>`).join("");
+
+  ingSections.innerHTML = mainHtml + openHtml;
   justAdded.clear();
   flashIds.clear();
   renderSectionChips();
-  if (focusSectionId) ingSections.querySelector(`.ing-input[data-sid="${focusSectionId}"]`)?.focus();
+  const renameInput = ingSections.querySelector(".rename-input");
+  if (renameInput) { renameInput.focus(); renameInput.select(); }
+  else if (focusSectionId) ingSections.querySelector(`.ing-input[data-sid="${focusSectionId}"]`)?.focus();
 }
+
+// ---------- Renommer une sous-rubrique ----------
+function commitRename(input, keep) {
+  if (renamingId !== input.dataset.rename) return;
+  const s = draft.sections.find(x => x.id === renamingId);
+  renamingId = null;
+  const name = capitalize(input.value.trim().slice(0, 40));
+  if (keep && s && name && name !== s.name) {
+    const clash = draft.sections.find(x => x !== s && normalizeText(x.name) === normalizeText(name));
+    if (clash) alert(`Une sous-rubrique « ${clash.name} » existe déjà.`);
+    else { s.name = name; flashIds.add(s.id); }
+  }
+  renderIngredients();
+}
+ingSections.addEventListener("keydown", e => {
+  if (!e.target.matches(".rename-input")) return;
+  if (e.key === "Enter") { e.preventDefault(); commitRename(e.target, true); }
+  if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); commitRename(e.target, false); }
+});
+ingSections.addEventListener("focusout", e => {
+  if (e.target.matches(".rename-input")) commitRename(e.target, true);
+});
 
 // Saisie manuelle : plusieurs ingrédients possibles, séparés par des virgules
 function submitTyped(input, pickedName) {
@@ -633,11 +711,16 @@ ingSections.addEventListener("click", e => {
     const input = ingSections.querySelector(`.ing-input[data-sid="${t.dataset.closeSection}"]`);
     if (input?.value.trim()) input.value.split(",").forEach(v => addIngredient(t.dataset.closeSection, v));
     draft.sections.find(x => x.id === t.dataset.closeSection).open = false;
+    justAdded.add(t.dataset.closeSection);
     closeAutocomplete();
     renderIngredients();
   }
+  else if (t.dataset.renameSection) {
+    renamingId = t.dataset.renameSection;
+    renderIngredients();
+  }
   else if (t.dataset.openSection) {
-    draft.sections.find(x => x.id === t.dataset.openSection).open = true;
+    draft.sections.slice(1).forEach(x => (x.open = x.id === t.dataset.openSection));
     renderIngredients(t.dataset.openSection);
   }
   else if (t.dataset.removeSection) {
@@ -769,7 +852,7 @@ function createSection(name, open) {
   name = capitalize(name.trim().slice(0, 40));
   if (!name) return null;
   let section = draft.sections.find(x => normalizeText(x.name) === normalizeText(name));
-  if (!section) { section = { id: newId(), name, items: [], open }; draft.sections.push(section); }
+  if (!section) { section = { id: newId(), name, items: [], open }; draft.sections.push(section); justAdded.add(section.id); }
   return section;
 }
 function addSection(name) {

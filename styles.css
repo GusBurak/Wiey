@@ -424,7 +424,7 @@ h1, h2 { font-family: Fraunces, Georgia, serif; font-weight: 500; margin: 0; }
 .ing-sections { display: flex; flex-direction: column; gap: 14px; }
 .ing-section { display: flex; flex-direction: column; gap: 8px; }
 .ing-section.sub { border-top: 1px dashed var(--border); padding-top: 12px; }
-.ing-section-head { display: flex; align-items: center; justify-content: space-between; }
+.ing-section-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .ing-section-name { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--accent); }
 .hint { margin: 0; font-size: 12px; color: var(--muted); }
 
@@ -489,6 +489,29 @@ h1, h2 { font-family: Fraunces, Georgia, serif; font-weight: 500; margin: 0; }
 
 .section-adder { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
 .section-adder .chip[hidden], .section-choices[hidden] { display: none; }
+/* Nom de sous-rubrique modifiable */
+.section-title { display: inline-flex; align-items: center; gap: 4px; min-width: 0; }
+.pen-btn {
+  width: 24px; height: 24px; border: none; background: none; border-radius: 6px;
+  display: grid; place-items: center; padding: 0; color: var(--muted); opacity: .6;
+}
+.pen-btn svg { width: 13px; height: 13px; }
+.pen-btn:hover, .pen-btn:focus-visible { opacity: 1; background: var(--hover); color: var(--text); }
+.add-form input.rename-input {
+  width: auto; flex: 1; max-width: 280px; padding: 4px 8px; font-size: 13px; font-weight: 600;
+}
+
+/* Sous-rubrique terminée, rangée dans la liste */
+.ingredient.group-row { align-items: center; padding-block: 7px; }
+.group-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.group-row .ing-section-name { text-transform: none; letter-spacing: 0; font-size: 14px; color: var(--text); }
+.group-row .section-title::before {
+  content: ""; width: 8px; height: 8px; border-radius: 2px; background: var(--accent);
+  margin-right: 4px; flex-shrink: 0;
+}
+.group-items { font-size: 12px; color: var(--muted); line-height: 1.45; overflow-wrap: anywhere; }
+.ingredient.group-row.entering { animation-duration: .35s; }
+
 .section-choices-head { display: flex; align-items: center; justify-content: space-between; }
 .ing-section-actions { display: flex; align-items: center; gap: 4px; }
 .text-btn {
