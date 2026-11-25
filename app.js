@@ -117,6 +117,10 @@ function preparedLabel(meal) {
   if (meal.preparedBy === "Livraison") return meal.preparer ? `Livré par ${meal.preparer}` : "En livraison";
   return meal.preparer ? `Chez ${meal.preparer}` : "Au restaurant";
 }
+// Couleur de bordure des miniatures selon qui a préparé le repas
+function prepClass(meal) {
+  return { "Un proche": "prep-proche", "Un resto": "prep-resto", "Livraison": "prep-livraison" }[meal.preparedBy] || "prep-moi";
+}
 function isWebLink(url) { return /^https?:\/\/\S+$/i.test(url); }
 const ICON_CHECK = `<svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>`;
 const ICON_X = `<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>`;
@@ -196,7 +200,7 @@ function renderCalendar() {
       </div>
       <div class="thumbs">
         ${dayMeals.map(meal => `
-          <button class="thumb${meal.leftover ? " leftover" : ""}" data-id="${escapeHtml(meal.id)}" style="background:${photoBg(meal)}" aria-label="${escapeHtml(mealMoment(meal) + " : " + meal.name)}">
+          <button class="thumb ${prepClass(meal)}${meal.leftover ? " leftover" : ""}" data-id="${escapeHtml(meal.id)}" style="background:${photoBg(meal)}" aria-label="${escapeHtml(mealMoment(meal) + " : " + meal.name)}">
             ${photoHtml(meal)}
           </button>`).join("")}
       </div>
@@ -247,7 +251,7 @@ function openDetail(id) {
   const ingredients = meal.ingredients || [];
   const prepared = preparedLabel(meal);
   detailContent.innerHTML = `
-    <div class="detail-photo" style="background:${photoBg(meal)}">${photoHtml(meal)}</div>
+    <div class="detail-photo${meal.photo ? " full" : ""}" style="background:${photoBg(meal)}">${photoHtml(meal)}</div>
     <h2 class="modal-title" style="margin-bottom:0">${escapeHtml(meal.name)}</h2>
     <div class="detail-meta">
       <span class="tag">${escapeHtml(mealMoment(meal))}</span>
