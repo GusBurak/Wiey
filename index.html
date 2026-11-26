@@ -154,6 +154,21 @@
             <span class="field-error" id="leftoverError" hidden>Choisis le plat que tu as mangé en restes.</span>
           </section>
 
+          <!-- Restes : ce qui était à améliorer la première fois -->
+          <section class="field-block leftover-only" id="leftoverImprove" hidden>
+            <span class="field-label">À améliorer</span>
+            <p class="improve-quote" id="leftoverImproveText"></p>
+            <label class="toggle improved-toggle">
+              <input type="checkbox" id="improvedToggle">
+              <span class="toggle-track"></span>
+              <span>J'ai amélioré</span>
+            </label>
+            <label class="field" id="improvedField" hidden>
+              <span class="field-label">Qu'as-tu amélioré ?</span>
+              <textarea id="improvedText" rows="2" placeholder="Ajouté du fromage, moins salé, réchauffé au four…"></textarea>
+            </label>
+          </section>
+
           <!-- Préparé par -->
           <section class="field-block normal-only">
             <div class="inline-field">

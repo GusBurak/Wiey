@@ -289,6 +289,7 @@ function openDetail(id) {
     ${ingredientsDetailHtml(ingredients)}
     ${meal.recipeUrl && isWebLink(meal.recipeUrl) ? `<div class="detail-section"><h3>Recette</h3><p><a href="${escapeHtml(meal.recipeUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(meal.recipeUrl)}</a></p></div>` : ""}
     ${meal.improve ? `<div class="detail-section"><h3>À améliorer</h3><p>${escapeHtml(meal.improve)}</p></div>` : ""}
+    ${meal.leftover && meal.improved ? `<div class="detail-section"><h3>Amélioré ✓</h3>${meal.improvedFrom ? `<p class="muted-text">À améliorer : ${escapeHtml(meal.improvedFrom)}</p>` : ""}<p>${escapeHtml(meal.improvedText || "C'est mieux cette fois-ci.")}</p></div>` : ""}
     ${meal.notes ? `<div class="detail-section"><h3>Notes</h3><p>${escapeHtml(meal.notes)}</p></div>` : ""}
     <div class="detail-actions">
       <button class="primary-btn small" data-edit="${escapeHtml(meal.id)}">Modifier</button>
@@ -420,6 +421,8 @@ function openAddPage(meal, presetDate) {
   renderTypeChips();
   renderPreparedByChips();
   if (meal?.leftover) draft.leftoverName = meal.name;
+  draft.improved = !!meal?.improved;
+  improvedText.value = meal?.improvedText || "";
   setLeftoverMode(!!meal?.leftover);
   renderStars();
   closeSectionChooser();
@@ -1689,7 +1692,7 @@ function setLeftoverMode(on) {
   leftoverError.hidden = true;
   closeAutocomplete();
   closePlaceList();
-  if (on) renderLeftovers();
+  if (on) { renderLeftovers(); renderLeftoverImprove(); }
 }
 leftoverToggle.addEventListener("change", () => setLeftoverMode(leftoverToggle.checked));
 form.date.addEventListener("change", () => { if (draft.leftover) renderLeftovers(); });
@@ -1703,6 +1706,26 @@ leftoverList.addEventListener("click", e => {
   if (src?.course) { draft.course = src.course; renderCourse(); }
   leftoverError.hidden = true;
   renderLeftovers();
+  renderLeftoverImprove();
+});
+
+// ---------- Restes : « À améliorer » de la première fois ----------
+const leftoverImprove = document.getElementById("leftoverImprove");
+const improvedToggle = document.getElementById("improvedToggle");
+const improvedField = document.getElementById("improvedField");
+const improvedText = document.getElementById("improvedText");
+function renderLeftoverImprove() {
+  const src = draft.leftoverName && firstOccurrence(draft.leftoverName);
+  const comment = src?.improve || "";
+  leftoverImprove.hidden = !comment; // rien à améliorer la première fois : pas de rubrique
+  document.getElementById("leftoverImproveText").textContent = comment;
+  improvedToggle.checked = !!draft.improved;
+  improvedField.hidden = !draft.improved;
+}
+improvedToggle.addEventListener("change", () => {
+  draft.improved = improvedToggle.checked;
+  improvedField.hidden = !draft.improved;
+  if (draft.improved) improvedText.focus();
 });
 
 function saveLeftover() {
@@ -1727,7 +1750,10 @@ function saveLeftover() {
     rating: src.rating || 0,
     ingredients: (src.ingredients || []).map(i => ({ ...i })),
     recipeUrl: src.recipeUrl || "",
-    improve: src.improve || "",
+    improve: "", // le commentaire d'origine n'est montré que si « J'ai amélioré » est coché
+    improved: !!src.improve && !!draft.improved,
+    improvedFrom: src.improve && draft.improved ? src.improve : "",
+    improvedText: src.improve && draft.improved ? improvedText.value.trim() : "",
     notes: form.notes.value.trim(), // les notes sont propres à ce repas de restes
     leftover: true,
     leftoverOf: src.id,
