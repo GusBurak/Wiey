@@ -921,3 +921,9 @@ h1, h2 { font-family: Fraunces, Georgia, serif; font-weight: 500; margin: 0; }
 .bar-col.selected .bar-label { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
 .bar-col.selected .bar { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--accent); border-radius: 4px; }
 .card-head { row-gap: 5px; }
+
+/* Légende des barres : à droite de % / Absolu, sur une seule ligne */
+.card-head .bars-legend { order: 4; margin: 0 0 0 auto; flex: 0 1 auto; flex-wrap: nowrap; gap: 4px 12px; min-width: 0; }
+.card-head .bars-legend li { font-size: 12px; white-space: nowrap; gap: 5px; color: var(--muted); }
+.card-head .bars-legend .sw { width: 10px; height: 10px; }
+@media (max-width: 520px) { .card-head .bars-legend { flex-wrap: wrap; margin-left: 0; } }

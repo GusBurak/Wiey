@@ -165,7 +165,8 @@ function renderBars(all) {
   document.getElementById("barsNext").disabled = last.getFullYear() > now.getFullYear() || (last.getFullYear() === now.getFullYear() && last.getMonth() >= now.getMonth());
   document.getElementById("barsToday").disabled = document.getElementById("barsNext").disabled;
   el.innerHTML = `<div class="bars" role="img" aria-label="Répartition par mois de qui a préparé les repas">${cols}</div>
-    <ul class="legend-list inline">${PREP_ORDER.map(p => `<li><i class="sw" style="background:${prepColor(p.key)}"></i><span>${p.label}</span></li>`).join("")}</ul>`;
+`;
+  document.getElementById("barsLegend").innerHTML = PREP_ORDER.map(p => `<li><i class="sw" style="background:${prepColor(p.key)}"></i><span>${p.label}</span></li>`).join("");
   bindTips(el);
   el.querySelectorAll("[data-goto-month]").forEach(x => x.addEventListener("click", () => selectMonth(x.dataset.gotoMonth)));
 }
