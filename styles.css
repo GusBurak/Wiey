@@ -754,7 +754,7 @@ h1, h2 { font-family: Fraunces, Georgia, serif; font-weight: 500; margin: 0; }
   .calendar-header h1 { font-size: 21px; }
   .calendar-header { grid-template-columns: 1fr auto; }
   .header-add { grid-column: 1 / -1; grid-row: 2; justify-content: center; }
-  .today-btn { display: none; }
+  .calendar-nav .today-btn { display: none; }
   .calendar-grid { gap: 3px; }
   .day { padding: 4px; }
 
@@ -904,3 +904,5 @@ h1, h2 { font-family: Fraunces, Georgia, serif; font-weight: 500; margin: 0; }
 .card-head h2 { margin: 0; }
 .period-nav.small .icon-btn { width: 28px; height: 28px; }
 .period-nav.small .period-label { min-width: 120px; font-size: 13px; text-transform: none; }
+.today-btn:disabled { opacity: .45; cursor: default; }
+.today-btn.small { height: 28px; padding: 0 10px; font-size: 12px; }

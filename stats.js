@@ -146,6 +146,7 @@ function renderBars(all) {
     ? `${MONTHS_FR[first.getMonth()]} – ${short(last)}` : `${short(first)} – ${short(last)}`;
   const now = new Date();
   document.getElementById("barsNext").disabled = last.getFullYear() > now.getFullYear() || (last.getFullYear() === now.getFullYear() && last.getMonth() >= now.getMonth());
+  document.getElementById("barsToday").disabled = document.getElementById("barsNext").disabled;
   el.innerHTML = `<div class="bars" role="img" aria-label="Répartition par mois de qui a préparé les repas">${cols}</div>
     <ul class="legend-list inline">${PREP_ORDER.map(p => `<li><i class="sw" style="background:${prepColor(p.key)}"></i><span>${p.label}</span></li>`).join("")}</ul>`;
   bindTips(el);
@@ -221,6 +222,7 @@ function renderStats() {
   document.getElementById("periodLabel").textContent = range.label;
   document.querySelectorAll("#periodMode [data-mode]").forEach(b => b.setAttribute("aria-checked", String(b.dataset.mode === statsState.mode)));
   document.getElementById("periodNext").disabled = isCurrentOrFuture();
+  document.getElementById("periodToday").disabled = isCurrentOrFuture();
   const all = statsMeals();
   const inPeriod = all.filter(m => m.date >= range.start && m.date <= range.end);
   renderDonut(inPeriod);
@@ -236,6 +238,14 @@ document.addEventListener("DOMContentLoaded", () => {
     hideTip();
     renderBars(statsMeals());
   };
+  // « Aujourd'hui » : mois (ou année) en cours / 6 derniers mois
+  document.getElementById("periodToday").addEventListener("click", () => { statsState.anchor = new Date(); renderStats(); });
+  document.getElementById("barsToday").addEventListener("click", () => {
+    const now = new Date();
+    statsState.barsEnd = new Date(now.getFullYear(), now.getMonth(), 1);
+    hideTip();
+    renderBars(statsMeals());
+  });
   document.getElementById("barsPrev").addEventListener("click", () => shiftBars(-1));
   document.getElementById("barsNext").addEventListener("click", () => shiftBars(1));
   document.getElementById("periodNext").addEventListener("click", () => shiftPeriod(1));
