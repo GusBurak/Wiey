@@ -289,7 +289,7 @@ function openDetail(id) {
     ${ingredientsDetailHtml(ingredients)}
     ${meal.recipeUrl && isWebLink(meal.recipeUrl) ? `<div class="detail-section"><h3>Recette</h3><p><a href="${escapeHtml(meal.recipeUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(meal.recipeUrl)}</a></p></div>` : ""}
     ${meal.improve ? `<div class="detail-section"><h3>À améliorer</h3><p>${escapeHtml(meal.improve)}</p></div>` : ""}
-    ${meal.leftover && meal.improved ? `<div class="detail-section"><h3>Amélioré ✓</h3>${meal.improvedFrom ? `<p class="muted-text">À améliorer : ${escapeHtml(meal.improvedFrom)}</p>` : ""}<p>${escapeHtml(meal.improvedText || "C'est mieux cette fois-ci.")}</p></div>` : ""}
+    ${meal.leftover && meal.improved ? `<div class="detail-section"><h3>Amélioré ✓</h3>${meal.improvedFrom ? `<p class="muted-text">À améliorer : ${escapeHtml(meal.improvedFrom)}</p>` : ""}<p>${escapeHtml(meal.improvedText || "C'est mieux cette fois-ci.")}</p>${meal.ratingBefore != null && meal.ratingBefore !== meal.rating ? `<p class="muted-text">Note : ${formatRating(meal.ratingBefore)} → ${formatRating(meal.rating)}</p>` : ""}</div>` : ""}
     ${meal.notes ? `<div class="detail-section"><h3>Notes</h3><p>${escapeHtml(meal.notes)}</p></div>` : ""}
     <div class="detail-actions">
       <button class="primary-btn small" data-edit="${escapeHtml(meal.id)}">Modifier</button>
@@ -1692,7 +1692,7 @@ function setLeftoverMode(on) {
   leftoverError.hidden = true;
   closeAutocomplete();
   closePlaceList();
-  if (on) { renderLeftovers(); renderLeftoverImprove(); }
+  if (on) { renderLeftovers(); renderLeftoverImprove(); } else renderLeftoverRating(null);
 }
 leftoverToggle.addEventListener("change", () => setLeftoverMode(leftoverToggle.checked));
 form.date.addEventListener("change", () => { if (draft.leftover) renderLeftovers(); });
@@ -1705,6 +1705,7 @@ leftoverList.addEventListener("click", e => {
   const src = firstOccurrence(draft.leftoverName);
   if (src?.course) { draft.course = src.course; renderCourse(); }
   leftoverError.hidden = true;
+  if (draft.improved) draft.rating = src?.rating || 0;
   renderLeftovers();
   renderLeftoverImprove();
 });
@@ -1721,11 +1722,24 @@ function renderLeftoverImprove() {
   document.getElementById("leftoverImproveText").textContent = comment;
   improvedToggle.checked = !!draft.improved;
   improvedField.hidden = !draft.improved;
+  renderLeftoverRating(src);
+}
+// « J'ai amélioré » coché : la note sur 5 réapparaît pour pouvoir la changer
+function renderLeftoverRating(src) {
+  const show = draft.leftover && !!draft.improved && !!src?.improve;
+  form.classList.toggle("show-rating", show);
+  document.getElementById("noteLabel").textContent = show ? "Nouvelle note" : "Note";
+  const hint = document.getElementById("noteOrigHint");
+  hint.hidden = !show;
+  if (show) hint.textContent = src.rating ? `La première fois : ${formatRating(src.rating)}` : "Pas de note la première fois.";
+  renderStars();
 }
 improvedToggle.addEventListener("change", () => {
   draft.improved = improvedToggle.checked;
   improvedField.hidden = !draft.improved;
-  if (draft.improved) improvedText.focus();
+  const src = draft.leftoverName && firstOccurrence(draft.leftoverName);
+  if (draft.improved) { draft.rating = src?.rating || 0; improvedText.focus(); } // on part de la note d'origine
+  renderLeftoverRating(src);
 });
 
 function saveLeftover() {
@@ -1747,7 +1761,8 @@ function saveLeftover() {
     preparedBy: src.preparedBy || "Moi",
     preparer: src.preparer || "",
     preparerAddress: src.preparerAddress || "",
-    rating: src.rating || 0,
+    rating: src.improve && draft.improved ? draft.rating : (src.rating || 0),
+    ratingBefore: src.improve && draft.improved ? (src.rating || 0) : null,
     ingredients: (src.ingredients || []).map(i => ({ ...i })),
     recipeUrl: src.recipeUrl || "",
     improve: "", // le commentaire d'origine n'est montré que si « J'ai amélioré » est coché
