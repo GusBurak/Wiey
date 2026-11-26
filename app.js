@@ -528,6 +528,8 @@ function fillDraftFromMeal(meal) {
   form.notes.value = meal.notes || "";
   draft.photo = meal.photo || null;
   draft.thumb = meal.thumb || null;
+  // Restes : la photo n'est « à eux » que si elle diffère de celle de la première fois
+  draft.photoOwn = !!meal.photo && !(meal.leftover && meal.photo === firstOccurrence(meal.name)?.photo);
   draft.emojiCustom = meal.emojiCustom || "";
   draft.photoBlob = meal.photo ? dataUrlToBlob(meal.photo) : null;
   draft.rating = meal.rating || 0;
@@ -571,6 +573,7 @@ photoInput.addEventListener("change", () => {
     canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
     draft.photo = canvas.toDataURL("image/jpeg", 0.8);
     draft.thumb = null;
+    draft.photoOwn = true; // photo choisie pour ce repas (ne sera pas remplacée par celle d'un plat en restes)
     const forPhoto = draft.photo;
     makeSmartThumb(forPhoto).then(t => { if (draft.photo === forPhoto) draft.thumb = t; }).catch(() => {});
     canvas.toBlob(b => { draft.photoBlob = b; updateAnalyzeState(); }, "image/jpeg", 0.85);
@@ -1795,6 +1798,14 @@ leftoverList.addEventListener("click", e => {
   if (src?.course) { draft.course = src.course; renderCourse(); }
   leftoverError.hidden = true;
   if (draft.improved) draft.rating = src?.rating || 0;
+  // Sans photo choisie pour ces restes, on montre celle de la première fois (remplaçable)
+  if (!draft.photoOwn) {
+    draft.photo = src?.photo || null;
+    draft.thumb = src?.thumb || null;
+    draft.photoBlob = null;
+    photoDrop.style.backgroundImage = draft.photo ? `url(${draft.photo})` : "";
+    photoDrop.classList.toggle("has-photo", !!draft.photo);
+  }
   renderLeftovers();
   renderLeftoverImprove();
 });
@@ -1843,8 +1854,8 @@ function saveLeftover() {
     date: form.date.value,
     type,
     course: COURSE_MEALS.includes(type) ? (draft.course || src.course || "Plat") : "",
-    photo: src.photo || null,
-    thumb: src.thumb || null,
+    photo: draft.photo || src.photo || null,
+    thumb: draft.photo ? (draft.thumb || (draft.photo === src.photo ? src.thumb : null)) : (src.thumb || null),
     ...(src.emojiCustom ? { emojiCustom: src.emojiCustom } : {}),
     emoji: null,
     color: null,
