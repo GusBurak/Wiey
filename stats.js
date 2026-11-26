@@ -45,7 +45,16 @@ function periodRange() {
 function shiftPeriod(step) {
   const a = statsState.anchor;
   statsState.anchor = statsState.mode === "year" ? new Date(a.getFullYear() + step, a.getMonth(), 1) : new Date(a.getFullYear(), a.getMonth() + step, 1);
+  syncBarsToPeriod();
   renderStats();
+}
+// Les 6 mois glissants suivent la période du haut : ils finissent sur le mois choisi
+// (en mode Année : décembre, ou le mois en cours pour l'année en cours)
+function syncBarsToPeriod() {
+  const a = statsState.anchor, now = new Date();
+  let end = statsState.mode === "year" ? new Date(a.getFullYear(), 11, 1) : new Date(a.getFullYear(), a.getMonth(), 1);
+  if (end > now) end = new Date(now.getFullYear(), now.getMonth(), 1);
+  statsState.barsEnd = end;
 }
 function isCurrentOrFuture() {
   const now = new Date(), a = statsState.anchor;
@@ -249,7 +258,7 @@ document.addEventListener("DOMContentLoaded", () => {
     renderBars(statsMeals());
   };
   // « Aujourd'hui » : mois (ou année) en cours / 6 derniers mois
-  document.getElementById("periodToday").addEventListener("click", () => { statsState.anchor = new Date(); renderStats(); });
+  document.getElementById("periodToday").addEventListener("click", () => { statsState.anchor = new Date(); syncBarsToPeriod(); renderStats(); });
   document.getElementById("barsMode").addEventListener("click", e => {
     const b = e.target.closest("[data-bars]");
     if (!b || b.dataset.bars === statsState.barsMode) return;
@@ -270,6 +279,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const b = e.target.closest("[data-mode]");
     if (!b || b.dataset.mode === statsState.mode) return;
     statsState.mode = b.dataset.mode;
+    syncBarsToPeriod();
     renderStats();
   });
 });
