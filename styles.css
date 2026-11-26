@@ -227,7 +227,7 @@ h1, h2 { font-family: Fraunces, Georgia, serif; font-weight: 500; margin: 0; }
 }
 .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
 /* Bordure épaisse selon qui a préparé */
-:root { --prep-moi: #1d6b3a; --prep-proche: #8fd18a; --prep-resto: #2f6fd6; --prep-livraison: #d43d3d; }
+:root { --prep-moi: #1d6b3a; --prep-proche: #8fd18a; --prep-resto: #2f6fd6; --prep-livraison: #d43d3d; --prep-autre: #9a968f; }
 /* Grandes vignettes carrées : 2 par case au maximum */
 /* Taille = la moitié de la largeur de la case (2 vignettes côte à côte), 60 px au maximum,
    quelle que soit la hauteur de l'écran */
@@ -250,6 +250,7 @@ h1, h2 { font-family: Fraunces, Georgia, serif; font-weight: 500; margin: 0; }
 .prep-proche { --prep: var(--prep-proche); }
 .prep-resto { --prep: var(--prep-resto); }
 .prep-livraison { --prep: var(--prep-livraison); }
+.prep-autre { --prep: var(--prep-autre); }
 .thumb:hover, .thumb:focus-visible {
   transform: scale(1.08);
   box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--prep);

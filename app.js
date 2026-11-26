@@ -3,7 +3,7 @@
 // Les données sont stockées dans le navigateur (localStorage).
 // =====================================================
 
-const KEYS = { meals: "wiey.meals", people: "wiey.people", restaurants: "wiey.restaurants", restaurantInfo: "wiey.restaurantInfo", near: "wiey.near", deliveries: "wiey.deliveries" };
+const KEYS = { meals: "wiey.meals", people: "wiey.people", restaurants: "wiey.restaurants", restaurantInfo: "wiey.restaurantInfo", near: "wiey.near", deliveries: "wiey.deliveries", others: "wiey.others" };
 const MEAL_TYPES = ["Petit-déjeuner", "Déjeuner", "Goûter", "Dîner"];
 const COURSES = ["Apéritif", "Entrée", "Plat", "Dessert"];
 const COURSE_MEALS = ["Déjeuner", "Dîner"]; // repas pour lesquels on précise le moment
@@ -74,6 +74,7 @@ let people = load(KEYS.people, () => []);
 let restaurants = load(KEYS.restaurants, () => []);
 let restaurantInfo = load(KEYS.restaurantInfo, () => ({})); // nom du resto → adresse
 let deliveries = load(KEYS.deliveries, () => []); // restos déjà commandés en livraison
+let others = load(KEYS.others, () => []); // précisions déjà saisies pour « Autre » (cantine, traiteur…)
 let nearPlace = load(KEYS.near, () => null); // { name, longitude, latitude } : ville de référence pour la recherche
 const saveMeals = () => save(KEYS.meals, meals);
 
@@ -129,11 +130,12 @@ function preparedLabel(meal) {
   if (meal.preparedBy === "Moi") return "Fait maison";
   if (meal.preparedBy === "Un proche") return meal.preparer ? `Par ${meal.preparer}` : "Par un proche";
   if (meal.preparedBy === "Livraison") return meal.preparer ? `Livré par ${meal.preparer}` : "En livraison";
+  if (meal.preparedBy === "Autre") return meal.preparer || "Autre";
   return meal.preparer ? `Chez ${meal.preparer}` : "Au restaurant";
 }
 // Couleur de bordure des miniatures selon qui a préparé le repas
 function prepClass(meal) {
-  return { "Un proche": "prep-proche", "Un resto": "prep-resto", "Livraison": "prep-livraison" }[meal.preparedBy] || "prep-moi";
+  return { "Un proche": "prep-proche", "Un resto": "prep-resto", "Livraison": "prep-livraison", "Autre": "prep-autre" }[meal.preparedBy] || "prep-moi";
 }
 function isWebLink(url) { return /^https?:\/\/\S+$/i.test(url); }
 const ICON_CHECK = `<svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>`;
@@ -608,13 +610,14 @@ courseChips.addEventListener("keydown", e => {
 
 // ---------- Préparé par ----------
 function preparerList() {
-  return { "Un proche": people, "Un resto": restaurants, "Livraison": deliveries }[preparedBy.value] || [];
+  return { "Un proche": people, "Un resto": restaurants, "Livraison": deliveries, "Autre": others }[preparedBy.value] || [];
 }
 function preparerKey() {
-  return { "Un proche": KEYS.people, "Un resto": KEYS.restaurants, "Livraison": KEYS.deliveries }[preparedBy.value];
+  return { "Un proche": KEYS.people, "Un resto": KEYS.restaurants, "Livraison": KEYS.deliveries, "Autre": KEYS.others }[preparedBy.value];
 }
 const isResto = () => preparedBy.value === "Un resto";
 const isDelivery = () => preparedBy.value === "Livraison";
+const isOther = () => preparedBy.value === "Autre";
 
 function renderPreparer() {
   const mode = preparedBy.value;
@@ -622,13 +625,13 @@ function renderPreparer() {
   if (mode === "Moi") { draft.preparer = ""; draft.preparerAddress = ""; renderNear(); return; }
   const list = preparerList();
   if (draft.preparer && !list.includes(draft.preparer)) draft.preparer = "";
-  // Livraison : un seul resto. Une fois choisi, il s'affiche seul avec une croix pour le changer.
-  if (isDelivery()) {
+  // Livraison / Autre : une seule valeur. Une fois choisie, elle s'affiche seule avec une croix pour la changer.
+  if (isDelivery() || isOther()) {
     preparerChips.innerHTML = draft.preparer
-      ? `<span class="chip selected-chip">${escapeHtml(draft.preparer)}<button type="button" class="chip-x" data-clear aria-label="Changer de resto">${ICON_X}</button></span>`
+      ? `<span class="chip selected-chip">${escapeHtml(draft.preparer)}<button type="button" class="chip-x" data-clear aria-label="Changer">${ICON_X}</button></span>`
       : "";
     preparerAddRow.hidden = !!draft.preparer;
-    preparerNew.placeholder = "Nom du resto qui a livré";
+    preparerNew.placeholder = isOther() ? "Préciser (facultatif) : cantine, traiteur, food truck…" : "Nom du resto qui a livré";
     renderNear();
     return;
   }
@@ -648,7 +651,7 @@ preparedBy.addEventListener("change", () => {
   closePlaceList();
   renderPreparer();
   // Pas encore de proche enregistré, ou mode resto : on ouvre directement la saisie
-  if (preparedBy.value !== "Moi" && (isResto() || isDelivery() || !preparerList().length)) showPreparerInput();
+  if (preparedBy.value !== "Moi" && (isResto() || isDelivery() || isOther() || !preparerList().length)) showPreparerInput();
 });
 
 preparerChips.addEventListener("click", e => {
@@ -839,7 +842,7 @@ function renderPlaceList() {
   const q = preparerNew.value.trim();
   const nq = normalizeText(q);
   // Un resto : uniquement les suggestions Mapbox. Livraison : tous les restos déjà enregistrés.
-  const pool = isResto() ? [] : isDelivery() ? [...new Set([...deliveries, ...restaurants])] : people;
+  const pool = isResto() ? [] : isDelivery() ? [...new Set([...deliveries, ...restaurants])] : isOther() ? others : people;
   const saved = pool
     .filter(n => normalizeText(n).includes(nq) && normalizeText(n) !== "")
     .sort((a, b) => normalizeText(a).indexOf(nq) - normalizeText(b).indexOf(nq))
@@ -1569,6 +1572,9 @@ form.addEventListener("submit", e => {
   if (badUrl) { form.recipeUrl.focus(); return; }
   if (!form.date.value) form.date.value = iso(new Date());
 
+  // Un nom tapé dans « Préparé par » sans avoir validé est pris en compte
+  if (preparedBy.value !== "Moi" && !draft.preparer && preparerNew.value.trim()) addPreparer();
+
   // Un ingrédient tapé mais pas encore ajouté est pris en compte
   ingSections.querySelectorAll(".ing-input").forEach(input =>
     input.value.split(",").forEach(v => v.trim() && addIngredient(input.dataset.sid, v)));
@@ -1674,8 +1680,10 @@ function renderLeftovers() {
   }).join("");
 }
 
+const NOTES_PLACEHOLDER = form.notes.placeholder;
 function setLeftoverMode(on) {
   draft.leftover = on;
+  form.notes.placeholder = on ? "Comment étaient ces restes ? Réchauffés, accompagnés d'autre chose…" : NOTES_PLACEHOLDER;
   leftoverToggle.checked = on;
   form.classList.toggle("leftover-mode", on);
   leftoverError.hidden = true;
@@ -1720,7 +1728,7 @@ function saveLeftover() {
     ingredients: (src.ingredients || []).map(i => ({ ...i })),
     recipeUrl: src.recipeUrl || "",
     improve: src.improve || "",
-    notes: src.notes || "",
+    notes: form.notes.value.trim(), // les notes sont propres à ce repas de restes
     leftover: true,
     leftoverOf: src.id,
   });

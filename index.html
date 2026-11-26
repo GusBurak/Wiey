@@ -74,6 +74,7 @@
           <span><i class="dot prep-proche"></i>Un proche</span>
           <span><i class="dot prep-resto"></i>Resto</span>
           <span><i class="dot prep-livraison"></i>Livraison</span>
+          <span><i class="dot prep-autre"></i>Autre</span>
         </div>
         <div class="weekdays">
           <span>Lun</span><span>Mar</span><span>Mer</span><span>Jeu</span><span>Ven</span><span>Sam</span><span>Dim</span>
@@ -162,6 +163,7 @@
                 <option>Un proche</option>
                 <option>Un resto</option>
                 <option>Livraison</option>
+                <option>Autre</option>
               </select>
               <div class="chip-list" id="preparedByChips" role="radiogroup" aria-label="Préparé par"></div>
             </div>
@@ -249,8 +251,8 @@
             </label>
           </section>
 
-          <!-- Notes -->
-          <section class="field-block normal-only">
+          <!-- Notes (aussi en mode Restes : commentaires propres à ce repas) -->
+          <section class="field-block">
             <label class="field">
               <span class="field-label">Notes</span>
               <textarea name="notes" rows="3" placeholder="Contexte, ressenti, avec qui, envie de le refaire…"></textarea>
