@@ -156,12 +156,16 @@ function route() {
   // #ajouter/AAAA-MM-JJ = nouveau repas à une date précise (bouton + d'une case du calendrier)
   const addMatch = location.hash.match(/^#ajouter(?:\/(\d{4}-\d{2}-\d{2}))?$/);
   const adding = !!addMatch || !!editMeal;
-  homeView.hidden = adding;
-  addView.hidden = !adding;
-  document.querySelector(".menu-item").classList.toggle("active", !adding);
+  const view = adding ? "add" : location.hash === "#stats" ? "stats" : location.hash === "#idees" ? "idees" : "home";
+  homeView.hidden = view !== "home";
+  addView.hidden = view !== "add";
+  document.getElementById("statsView").hidden = view !== "stats";
+  document.getElementById("ideasView").hidden = view !== "idees";
+  document.querySelectorAll(".menu-item").forEach(a => a.classList.toggle("active", a.dataset.view === view));
   closeModals();
-  if (adding) openAddPage(editMeal || null, addMatch && addMatch[1]);
-  else refresh();
+  if (view === "add") openAddPage(editMeal || null, addMatch && addMatch[1]);
+  else if (view === "stats") renderStats();
+  else if (view === "home") refresh();
   document.querySelector(".content").scrollTop = 0;
   sidebar.classList.remove("open");
 }
@@ -171,7 +175,7 @@ document.querySelectorAll('[data-action="add"]').forEach(el => {
   el.addEventListener("click", () => { location.hash = "ajouter"; });
   el.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); location.hash = "ajouter"; } });
 });
-document.querySelectorAll('.back-link, .link-btn, .menu-item').forEach(a =>
+document.querySelectorAll('.back-link, .link-btn, .menu-item[data-view="home"]').forEach(a =>
   a.addEventListener("click", e => { e.preventDefault(); goHome(); }));
 
 function goHome() {

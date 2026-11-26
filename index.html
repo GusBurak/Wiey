@@ -24,13 +24,17 @@
       </button>
 
       <nav class="menu">
-        <a href="#" class="menu-item active">
+        <a href="#" class="menu-item active" data-view="home">
           <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/></svg>
           Calendrier
         </a>
-        <a href="#" class="menu-item">
+        <a href="#stats" class="menu-item" data-view="stats">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>
           Statistiques
+        </a>
+        <a href="#idees" class="menu-item" data-view="idees">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.6 10.8c.7.5 1.1 1.3 1.1 2.2h5c0-.9.4-1.7 1.1-2.2A6 6 0 0 0 12 3z"/></svg>
+          Idée repas
         </a>
       </nav>
 
@@ -82,6 +86,69 @@
         <div class="calendar-grid" id="calendarGrid"></div>
       </section>
 
+      </div>
+
+      <!-- ===== Vue « Statistiques » ===== -->
+      <div class="stats-view" id="statsView" hidden>
+        <header class="stats-header">
+          <h1>Statistiques</h1>
+          <div class="period-ctrl">
+            <div class="seg" id="periodMode" role="radiogroup" aria-label="Période">
+              <button type="button" role="radio" data-mode="month" aria-checked="true">Mois</button>
+              <button type="button" role="radio" data-mode="year" aria-checked="false">Année</button>
+            </div>
+            <div class="period-nav">
+              <button class="icon-btn" id="periodPrev" aria-label="Période précédente"><svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></button>
+              <span class="period-label" id="periodLabel"></span>
+              <button class="icon-btn" id="periodNext" aria-label="Période suivante"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button>
+            </div>
+          </div>
+          <label class="toggle demo-toggle" title="Afficher des repas inventés pour voir le rendu">
+            <input type="checkbox" id="demoToggle">
+            <span class="toggle-track"></span>
+            <span>Données d'exemple</span>
+          </label>
+        </header>
+        <p class="demo-banner" id="demoBanner" hidden>Données d'exemple, inventées depuis janvier : tes vrais repas ne sont ni affichés ni modifiés.</p>
+
+        <div class="stats-grid">
+          <!-- Gauche : habitudes de consommation -->
+          <div class="stats-col">
+            <section class="card stat-card">
+              <h2>Qui a préparé ce que j'ai mangé</h2>
+              <p class="stat-sub" id="donutSub"></p>
+              <div class="donut-wrap" id="donutChart"></div>
+            </section>
+            <section class="card stat-card">
+              <h2>Répartition sur les 6 derniers mois</h2>
+              <p class="stat-sub">Chaque barre = 100 % des repas du mois · nombre de repas au-dessus</p>
+              <div class="bars-wrap" id="barsChart"></div>
+            </section>
+          </div>
+          <!-- Droite : classements -->
+          <div class="stats-col">
+            <section class="card stat-card">
+              <h2>Ingrédients les plus utilisés</h2>
+              <div class="rank" id="rankIngredients"></div>
+            </section>
+            <section class="card stat-card">
+              <h2>Restos les plus fréquentés</h2>
+              <div class="rank" id="rankRestos"></div>
+            </section>
+            <section class="card stat-card">
+              <h2>Qui m'a fait le plus à manger</h2>
+              <div class="rank" id="rankCooks"></div>
+            </section>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== Vue « Idée repas » (à venir) ===== -->
+      <div class="ideas-view" id="ideasView" hidden>
+        <div class="card ideas-card">
+          <h1>Idée repas</h1>
+          <p>Cette page arrive bientôt.</p>
+        </div>
       </div>
 
       <!-- ===== Vue « Ajouter un repas » ===== -->
@@ -284,6 +351,9 @@
     </main>
   </div>
 
+  <!-- Infobulle des graphiques -->
+  <div class="chart-tip" id="chartTip" role="tooltip" hidden></div>
+
   <!-- Aperçu au survol -->
   <div class="hover-preview" id="hoverPreview" aria-hidden="true"></div>
 
@@ -311,6 +381,7 @@
 
   <script src="ingredients.js"></script>
   <script src="smartcrop.js"></script>
+  <script src="stats.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

@@ -764,3 +764,106 @@ h1, h2 { font-family: Fraunces, Georgia, serif; font-weight: 500; margin: 0; }
   .idea-head { flex-wrap: wrap; }
   .idea-head h2 { font-size: 19px; }
 }
+
+/* =====================================================
+   Statistiques
+   ===================================================== */
+.stats-view[hidden], .ideas-view[hidden] { display: none; }
+.stats-view { display: flex; flex-direction: column; gap: 14px; min-height: 100%; }
+.stats-header { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.stats-header h1 { font-size: 28px; margin-right: auto; }
+.period-ctrl { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.seg { display: inline-flex; background: var(--hover); border-radius: 10px; padding: 3px; }
+.seg button {
+  border: none; background: transparent; border-radius: 8px; padding: 6px 14px; font-size: 13px; font-weight: 500; color: var(--muted);
+}
+.seg button[aria-checked="true"] { background: var(--surface); color: var(--text); box-shadow: 0 1px 3px rgba(0, 0, 0, .1); }
+.period-nav { display: flex; align-items: center; gap: 6px; }
+.period-label { min-width: 130px; text-align: center; font-weight: 600; text-transform: capitalize; font-variant-numeric: tabular-nums; }
+.icon-btn:disabled { opacity: .35; cursor: default; }
+.demo-toggle { font-size: 13px; }
+.demo-banner {
+  margin: -4px 0 0; font-size: 12px; color: var(--muted); background: var(--hover);
+  border-radius: 8px; padding: 6px 10px; align-self: flex-start;
+}
+.demo-banner[hidden] { display: none; }
+
+.stats-grid { display: grid; grid-template-columns: 1.15fr 1fr; gap: 16px; flex: 1; align-items: start; }
+.stats-col { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.stat-card { padding: 18px 20px; }
+.stat-card h2 { font-size: 18px; margin-bottom: 2px; }
+.stat-sub { margin: 0 0 12px; font-size: 12px; color: var(--muted); }
+.empty-chart { color: var(--muted); font-size: 13px; margin: 12px 0; }
+
+/* Anneau */
+.donut-wrap { display: flex; align-items: center; gap: 28px; flex-wrap: wrap; }
+.donut { width: 210px; height: 210px; flex-shrink: 0; }
+.seg-arc { stroke: var(--surface); stroke-width: 2px; cursor: default; transition: opacity .12s ease; outline: none; }
+.donut-arcs:hover .seg-arc { opacity: .55; }
+.donut-arcs .seg-arc:hover, .seg-arc:focus-visible { opacity: 1; }
+.donut-total { font: 600 30px Fraunces, Georgia, serif; fill: var(--text); }
+.donut text { font-family: Inter, system-ui, sans-serif; }
+.donut-unit { font-size: 12px; font-weight: 400; fill: var(--muted); }
+.donut .donut-total { font: 600 30px Fraunces, Georgia, serif; }
+.legend-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; flex: 1; min-width: 180px; }
+.legend-list li { display: grid; grid-template-columns: 14px 1fr auto 44px; align-items: center; gap: 8px; font-size: 13px; }
+.legend-list li.zero { color: var(--muted); }
+.legend-list b { font-variant-numeric: tabular-nums; font-weight: 600; }
+.legend-list em { font-style: normal; color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; }
+.legend-list .sw { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+.legend-list.inline { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 14px; }
+.legend-list.inline li { display: inline-flex; gap: 6px; }
+
+/* Barres 100 % */
+.bars { display: grid; grid-template-columns: repeat(6, 1fr); gap: 14px; align-items: end; }
+.bar-col { display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 0; }
+.bar-count { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.bar { width: min(46px, 100%); display: flex; flex-direction: column-reverse; gap: 2px; }
+.bar.empty { border: 1.5px dashed var(--border); border-radius: 4px; }
+.bar-seg { width: 100%; outline: none; transition: opacity .12s ease; }
+.bar-seg.top { border-radius: 4px 4px 0 0; }
+.bar-seg.bottom { border-radius: 0 0 2px 2px; }
+.bars:hover .bar-seg { opacity: .6; }
+.bars .bar-seg:hover, .bar-seg:focus-visible { opacity: 1; }
+.bar-label { font-size: 12px; color: var(--muted); }
+
+/* Classements */
+.rank-list { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.rank-list li { display: grid; grid-template-columns: 22px minmax(90px, 1.1fr) 2fr 36px; align-items: center; gap: 10px; outline: none; border-radius: 6px; }
+.rank-list li:focus-visible { box-shadow: 0 0 0 2px var(--accent); }
+.rank-pos {
+  width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--hover); font-size: 12px; font-weight: 600; color: var(--muted);
+}
+.rank-list li:first-child .rank-pos { background: var(--accent-soft); color: var(--accent); }
+.rank-name { font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rank-name small { display: block; font-size: 11px; color: var(--muted); }
+.rank-bar { height: 10px; background: var(--hover); border-radius: 999px; overflow: hidden; }
+.rank-bar span { display: block; height: 100%; border-radius: 999px; }
+.rank-val { text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; font-size: 14px; }
+
+/* Infobulle */
+.chart-tip {
+  position: fixed; z-index: 400; pointer-events: none; background: var(--text); color: var(--bg);
+  border-radius: 8px; padding: 8px 10px; font-size: 12px; box-shadow: 0 8px 24px rgba(0, 0, 0, .2); max-width: 240px;
+}
+.chart-tip[hidden] { display: none; }
+.chart-tip strong { display: block; margin-bottom: 4px; text-transform: capitalize; }
+.tip-row { display: flex; align-items: center; gap: 6px; }
+.tip-row i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; box-shadow: 0 0 0 1px rgba(255, 255, 255, .5); }
+.tip-row b { margin-left: auto; padding-left: 10px; }
+
+/* Idée repas (à venir) */
+.ideas-view { display: grid; place-items: center; min-height: 60vh; }
+.ideas-card { padding: 32px 40px; text-align: center; }
+.ideas-card p { color: var(--muted); margin: 8px 0 0; }
+
+@media (max-width: 1100px) {
+  .stats-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 860px) {
+  .stats-header h1 { font-size: 22px; width: 100%; }
+  .donut { width: 170px; height: 170px; }
+  .bars { gap: 8px; }
+  .rank-list li { grid-template-columns: 22px minmax(70px, 1fr) 1.4fr 32px; gap: 8px; }
+}
