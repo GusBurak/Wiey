@@ -19,6 +19,7 @@ const statsState = {
   anchor: new Date(),                 // un jour dans la période affichée
   initialized: false,
   barsEnd: null,
+  barsYear: null,                     // année affichée par les barres en mode Année
   barsMode: "pct",                    // "pct" : barres à 100 % · "abs" : hauteur selon le nombre de repas                      // dernier mois des 6 mois glissants (indépendant de la période)
 };
 
@@ -52,7 +53,9 @@ function shiftPeriod(step) {
 // (en mode Année : décembre, ou le mois en cours pour l'année en cours)
 function syncBarsToPeriod() {
   const a = statsState.anchor, now = new Date();
-  let end = statsState.mode === "year" ? new Date(a.getFullYear(), 11, 1) : new Date(a.getFullYear(), a.getMonth(), 1);
+  statsState.barsYear = a.getFullYear();
+  if (statsState.mode === "year") return; // en mode Année, les barres montrent les 12 mois de l'année choisie
+  let end = new Date(a.getFullYear(), a.getMonth(), 1);
   if (end > now) end = new Date(now.getFullYear(), now.getMonth(), 1);
   statsState.barsEnd = end;
 }
@@ -122,9 +125,17 @@ function renderDonut(list) {
 // ---------- Barres 100 % : 6 derniers mois ----------
 function renderBars(all) {
   const el = document.getElementById("barsChart");
-  const endMonth = statsState.barsEnd;
+  const yearView = statsState.mode === "year";
   const months = [];
-  for (let i = 5; i >= 0; i--) months.push(new Date(endMonth.getFullYear(), endMonth.getMonth() - i, 1));
+  if (yearView) {
+    if (statsState.barsYear == null) statsState.barsYear = statsState.anchor.getFullYear();
+    for (let i = 0; i < 12; i++) months.push(new Date(statsState.barsYear, i, 1));
+  } else {
+    const endMonth = statsState.barsEnd;
+    for (let i = 5; i >= 0; i--) months.push(new Date(endMonth.getFullYear(), endMonth.getMonth() - i, 1));
+  }
+  const n = months.length;
+  const last6 = months[n - 1];
   const H = 180;
   const abs = statsState.barsMode === "abs";
   const totals = months.map(m => { const k = `${m.getFullYear()}-${String(m.getMonth() + 1).padStart(2, "0")}`; return all.filter(x => x.date.startsWith(k)).length; });
@@ -134,7 +145,8 @@ function renderBars(all) {
     const key = `${m.getFullYear()}-${String(m.getMonth() + 1).padStart(2, "0")}`;
     const inMonth = all.filter(x => x.date.startsWith(key));
     const total = inMonth.length;
-    const label = `${MONTHS_FR[m.getMonth()]}${m.getMonth() === 0 || m.getFullYear() !== endMonth.getFullYear() ? " " + String(m.getFullYear()).slice(2) : ""}`;
+    const label = yearView ? MONTHS_FR[m.getMonth()]
+      : `${MONTHS_FR[m.getMonth()]}${m.getMonth() === 0 || m.getFullYear() !== last6.getFullYear() ? " " + String(m.getFullYear()).slice(2) : ""}`;
     const longLabel = m.toLocaleDateString("fr-FR", { month: "long", year: "numeric" });
     let segs = "";
     if (total) {
@@ -151,20 +163,22 @@ function renderBars(all) {
     const selected = statsState.mode === "month" && statsState.anchor.getFullYear() === m.getFullYear() && statsState.anchor.getMonth() === m.getMonth();
     return `<div class="bar-col${selected ? " selected" : ""}">
       <div class="bar-slot" style="height:${H + 22}px">
-        <span class="bar-count">${total} repas</span>
+        <span class="bar-count">${yearView ? total : `${total} repas`}</span>
         <div class="bar${total ? "" : " empty"}" style="height:${abs ? (total ? Math.max(4, (total / maxTotal) * H) : 4) : H}px" data-goto-month="${key}">${segs}</div>
       </div>
       <button type="button" class="bar-label" data-goto-month="${key}" aria-pressed="${selected}" aria-label="Afficher ${longLabel} dans l'anneau et les classements">${label}</button>
     </div>`;
   }).join("");
-  const first = months[0], last = months[5];
+  const first = months[0], last = months[n - 1];
   const short = d => d.toLocaleDateString("fr-FR", { month: "short", year: "numeric" });
-  document.getElementById("barsLabel").textContent = first.getFullYear() === last.getFullYear()
-    ? `${MONTHS_FR[first.getMonth()]} – ${short(last)}` : `${short(first)} – ${short(last)}`;
+  document.getElementById("barsTitle").textContent = yearView ? "Répartition sur l'année" : "Répartition sur 6 mois";
+  document.getElementById("barsLabel").textContent = yearView ? String(statsState.barsYear)
+    : first.getFullYear() === last.getFullYear() ? `${MONTHS_FR[first.getMonth()]} – ${short(last)}` : `${short(first)} – ${short(last)}`;
   const now = new Date();
-  document.getElementById("barsNext").disabled = last.getFullYear() > now.getFullYear() || (last.getFullYear() === now.getFullYear() && last.getMonth() >= now.getMonth());
+  document.getElementById("barsNext").disabled = yearView ? statsState.barsYear >= now.getFullYear()
+    : last.getFullYear() > now.getFullYear() || (last.getFullYear() === now.getFullYear() && last.getMonth() >= now.getMonth());
   document.getElementById("barsToday").disabled = document.getElementById("barsNext").disabled;
-  el.innerHTML = `<div class="bars" role="img" aria-label="Répartition par mois de qui a préparé les repas">${cols}</div>
+  el.innerHTML = `<div class="bars${yearView ? " year" : ""}" style="grid-template-columns:repeat(${n},1fr)" role="img" aria-label="Répartition par mois de qui a préparé les repas">${cols}</div>
 `;
   document.getElementById("barsLegend").innerHTML = PREP_ORDER.map(p => `<li><i class="sw" style="background:${prepColor(p.key)}"></i><span>${p.label}</span></li>`).join("");
   bindTips(el);
@@ -176,8 +190,10 @@ function renderBars(all) {
 function selectMonth(key) {
   const [y, m] = key.split("-").map(Number);
   hideTip();
+  const fromYear = statsState.mode === "year";
   statsState.mode = "month";
   statsState.anchor = new Date(y, m - 1, 1);
+  if (fromYear) syncBarsToPeriod(); // depuis la vue Année, les 6 mois se calent sur le mois choisi
   renderStats();
 }
 
@@ -254,7 +270,8 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("periodPrev").addEventListener("click", () => shiftPeriod(-1));
   const shiftBars = step => {
     const e = statsState.barsEnd;
-    statsState.barsEnd = new Date(e.getFullYear(), e.getMonth() + step, 1);
+    if (statsState.mode === "year") statsState.barsYear += step; // une année à la fois
+    else statsState.barsEnd = new Date(e.getFullYear(), e.getMonth() + step, 1);
     hideTip();
     renderBars(statsMeals());
   };
@@ -270,6 +287,7 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("barsToday").addEventListener("click", () => {
     const now = new Date();
     statsState.barsEnd = new Date(now.getFullYear(), now.getMonth(), 1);
+    statsState.barsYear = now.getFullYear();
     hideTip();
     renderBars(statsMeals());
   });

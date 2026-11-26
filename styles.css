@@ -927,3 +927,8 @@ h1, h2 { font-family: Fraunces, Georgia, serif; font-weight: 500; margin: 0; }
 .card-head .bars-legend li { font-size: 12px; white-space: nowrap; gap: 5px; color: var(--muted); }
 .card-head .bars-legend .sw { width: 10px; height: 10px; }
 @media (max-width: 520px) { .card-head .bars-legend { flex-wrap: wrap; margin-left: 0; } }
+
+/* Vue Année : 12 barres plus étroites */
+.bars.year { gap: 6px; }
+.bars.year .bar { width: min(30px, 100%); }
+.bars.year .bar-label { padding: 3px 2px; font-size: 11px; }
