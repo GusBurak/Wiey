@@ -18,7 +18,8 @@ const statsState = {
   mode: "month",                      // "month" | "year"
   anchor: new Date(),                 // un jour dans la période affichée
   initialized: false,
-  barsEnd: null,                      // dernier mois des 6 mois glissants (indépendant de la période)
+  barsEnd: null,
+  barsMode: "pct",                    // "pct" : barres à 100 % · "abs" : hauteur selon le nombre de repas                      // dernier mois des 6 mois glissants (indépendant de la période)
 };
 
 function prepColor(key) {
@@ -116,6 +117,10 @@ function renderBars(all) {
   const months = [];
   for (let i = 5; i >= 0; i--) months.push(new Date(endMonth.getFullYear(), endMonth.getMonth() - i, 1));
   const H = 180;
+  const abs = statsState.barsMode === "abs";
+  const totals = months.map(m => { const k = `${m.getFullYear()}-${String(m.getMonth() + 1).padStart(2, "0")}`; return all.filter(x => x.date.startsWith(k)).length; });
+  const maxTotal = Math.max(1, ...totals);
+  document.querySelectorAll("#barsMode [data-bars]").forEach(b => b.setAttribute("aria-checked", String(b.dataset.bars === statsState.barsMode)));
   const cols = months.map(m => {
     const key = `${m.getFullYear()}-${String(m.getMonth() + 1).padStart(2, "0")}`;
     const inMonth = all.filter(x => x.date.startsWith(key));
@@ -135,8 +140,10 @@ function renderBars(all) {
       }).join("");
     }
     return `<div class="bar-col">
-      <span class="bar-count">${total} repas</span>
-      <div class="bar${total ? "" : " empty"}" style="height:${H}px" data-goto-month="${key}">${segs}</div>
+      <div class="bar-slot" style="height:${H + 22}px">
+        <span class="bar-count">${total} repas</span>
+        <div class="bar${total ? "" : " empty"}" style="height:${abs ? (total ? Math.max(4, (total / maxTotal) * H) : 4) : H}px" data-goto-month="${key}">${segs}</div>
+      </div>
       <button type="button" class="bar-label" data-goto-month="${key}" aria-label="Voir ${longLabel} dans le calendrier">${label}</button>
     </div>`;
   }).join("");
@@ -240,6 +247,13 @@ document.addEventListener("DOMContentLoaded", () => {
   };
   // « Aujourd'hui » : mois (ou année) en cours / 6 derniers mois
   document.getElementById("periodToday").addEventListener("click", () => { statsState.anchor = new Date(); renderStats(); });
+  document.getElementById("barsMode").addEventListener("click", e => {
+    const b = e.target.closest("[data-bars]");
+    if (!b || b.dataset.bars === statsState.barsMode) return;
+    statsState.barsMode = b.dataset.bars;
+    hideTip();
+    renderBars(statsMeals());
+  });
   document.getElementById("barsToday").addEventListener("click", () => {
     const now = new Date();
     statsState.barsEnd = new Date(now.getFullYear(), now.getMonth(), 1);

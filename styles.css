@@ -906,3 +906,10 @@ h1, h2 { font-family: Fraunces, Georgia, serif; font-weight: 500; margin: 0; }
 .period-nav.small .period-label { min-width: 120px; font-size: 13px; text-transform: none; }
 .today-btn:disabled { opacity: .45; cursor: default; }
 .today-btn.small { height: 28px; padding: 0 10px; font-size: 12px; }
+
+/* Barres : « % » (même hauteur) ou « Absolu » (selon le nombre de repas) */
+.seg.small button { padding: 4px 10px; font-size: 12px; }
+.card-head .seg.small { margin-left: auto; }
+.bar-slot { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 6px; width: 100%; }
+.bar { transition: height .25s ease; }
+@media (prefers-reduced-motion: reduce) { .bar { transition: none; } }
