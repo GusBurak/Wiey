@@ -913,3 +913,7 @@ h1, h2 { font-family: Fraunces, Georgia, serif; font-weight: 500; margin: 0; }
 .bar-slot { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 6px; width: 100%; }
 .bar { transition: height .25s ease; }
 @media (prefers-reduced-motion: reduce) { .bar { transition: none; } }
+
+/* Mois sélectionné dans les barres (= période de l'anneau et des classements) */
+.bar-col.selected .bar-label { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.bar-col.selected .bar { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--accent); border-radius: 4px; }

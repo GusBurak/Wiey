@@ -139,12 +139,13 @@ function renderBars(all) {
           aria-label="${longLabel}, ${p.label} : ${p.n} repas, ${pct(p.n, total)} %"></div>`;
       }).join("");
     }
-    return `<div class="bar-col">
+    const selected = statsState.mode === "month" && statsState.anchor.getFullYear() === m.getFullYear() && statsState.anchor.getMonth() === m.getMonth();
+    return `<div class="bar-col${selected ? " selected" : ""}">
       <div class="bar-slot" style="height:${H + 22}px">
         <span class="bar-count">${total} repas</span>
         <div class="bar${total ? "" : " empty"}" style="height:${abs ? (total ? Math.max(4, (total / maxTotal) * H) : 4) : H}px" data-goto-month="${key}">${segs}</div>
       </div>
-      <button type="button" class="bar-label" data-goto-month="${key}" aria-label="Voir ${longLabel} dans le calendrier">${label}</button>
+      <button type="button" class="bar-label" data-goto-month="${key}" aria-pressed="${selected}" aria-label="Afficher ${longLabel} dans l'anneau et les classements">${label}</button>
     </div>`;
   }).join("");
   const first = months[0], last = months[5];
@@ -157,15 +158,17 @@ function renderBars(all) {
   el.innerHTML = `<div class="bars" role="img" aria-label="Répartition par mois de qui a préparé les repas">${cols}</div>
     <ul class="legend-list inline">${PREP_ORDER.map(p => `<li><i class="sw" style="background:${prepColor(p.key)}"></i><span>${p.label}</span></li>`).join("")}</ul>`;
   bindTips(el);
-  el.querySelectorAll("[data-goto-month]").forEach(x => x.addEventListener("click", () => openMonthInCalendar(x.dataset.gotoMonth)));
+  el.querySelectorAll("[data-goto-month]").forEach(x => x.addEventListener("click", () => selectMonth(x.dataset.gotoMonth)));
 }
 
-// Clic sur un mois : on ouvre le calendrier sur ce mois
-function openMonthInCalendar(key) {
+// Clic sur un mois des barres : ce mois devient la période de l'anneau et des classements
+// (les 6 mois glissants ne bougent pas)
+function selectMonth(key) {
   const [y, m] = key.split("-").map(Number);
   hideTip();
-  viewDate = new Date(y, m - 1, 1);
-  goHome();
+  statsState.mode = "month";
+  statsState.anchor = new Date(y, m - 1, 1);
+  renderStats();
 }
 
 // ---------- Classements ----------
