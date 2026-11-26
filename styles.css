@@ -882,3 +882,17 @@ h1, h2 { font-family: Fraunces, Georgia, serif; font-weight: 500; margin: 0; }
 .stat-card .donut-wrap, .stat-card .bars-wrap { flex: 1; }
 .stat-card .donut-wrap { align-content: center; }
 .stat-card .bars-wrap { display: flex; flex-direction: column; justify-content: center; }
+
+/* Emoji d'un repas sans photo : modifiable depuis la fiche */
+.detail-photo { position: relative; }
+.emoji-edit {
+  position: absolute; right: 12px; bottom: 12px; border: none; border-radius: 8px; padding: 6px 10px;
+  background: rgba(20, 19, 17, .6); color: #fff; font-size: 12px; font-weight: 500;
+}
+.emoji-edit:hover { background: rgba(20, 19, 17, .8); }
+.emoji-picker { margin: -6px 0 14px; padding: 10px; border: 1px solid var(--border); border-radius: 12px; background: var(--bg); }
+.emoji-picker[hidden] { display: none; }
+.emoji-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(38px, 1fr)); gap: 4px; margin-bottom: 6px; }
+.emoji-choice { border: 1px solid transparent; background: none; border-radius: 8px; font-size: 22px; height: 38px; line-height: 1; }
+.emoji-choice:hover { background: var(--hover); }
+.emoji-choice.on { border-color: var(--accent); background: var(--accent-soft); }

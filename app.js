@@ -134,9 +134,43 @@ function thumbHtml(meal) {
   return escapeHtml(guessEmoji(meal));
 }
 
-// Sans photo : un emoji selon le repas
+// Sans photo : l'emoji choisi à la main, sinon celui qui correspond le mieux au NOM du plat
+// (le premier mot reconnu dans le nom l'emporte : « Poulet sauce moutarde & riz » → 🍗),
+// sinon un emoji neutre selon le repas.
 const DEFAULT_EMOJI = { "Petit-déjeuner": "🥐", "Déjeuner": "🍽️", "Goûter": "🍪", "Dîner": "🍽️" };
-function guessEmoji(meal) { return DEFAULT_EMOJI[meal.type] || "🍽️"; }
+const DISH_EMOJI_RULES = [
+  [/pizza/, "🍕"], [/burger|cheeseburger|mcdo/, "🍔"], [/sushi|maki|sashimi/, "🍣"], [/onigiri/, "🍙"], [/bento/, "🍱"],
+  [/bo bun|ramen|\bpho\b|nouille|udon|soba|pad tha/, "🍜"],
+  [/pates|spaghetti|lasagne|tagliatelle|penne|orecchiette|carbonara|bolo|gnocchi|ravioli/, "🍝"],
+  [/curry|tikka|masala|mafe|dal\b/, "🍛"], [/burrito/, "🌯"], [/taco|fajita|quesadilla|nachos/, "🌮"],
+  [/kebab|kebi|shawarma|durum|pita|wrap|falafel/, "🥙"], [/hot ?dog/, "🌭"],
+  [/sandwich|panini|croque|club/, "🥪"], [/bagel/, "🥯"], [/gyoza|dumpling|dim sum|ravioli chinois|bao\b/, "🥟"],
+  [/soupe|veloute|potage|bouillon|pot-au-feu|blanquette|tajine|fumbwa|liboke/, "🍲"],
+  [/salade|bowl|poke|buddha|coleslaw|taboule/, "🥗"], [/pancakes? au porc|pancakes? coreen/, "🥟"], [/crepe|galette complete|pancake|gaufre|brunch/, "🥞"],
+  [/croissant|viennoiserie|kouign/, "🥐"], [/tarte (aux pommes|au citron|tatin|aux fraises|au chocolat)/, "🍰"], [/quiche|tourte|tarte|feuillete/, "🥧"], [/pommes? noisettes?|frite|pomme de terre|patate|puree|tartiflette|gratin/, "🥔"],
+  [/omelette|oeuf/, "🍳"], [/riz|risotto|paella|dopbap|bibimbap|over rice/, "🍚"],
+  [/crevette|gambas/, "🍤"], [/saint-jacques/, "🦪"], [/fish|poisson|saumon|thon|cabillaud|sardine|truite|dorade|moule/, "🐟"],
+  [/barbecue|merguez|saucisse|brochette|ribs|pastrami/, "🍖"], [/poulet|dinde|canard|nugget/, "🍗"],
+  [/steak|boeuf|entrecote|bavette|agneau|veau|porc|echine|schnitzel|escalope|viande/, "🥩"],
+  [/fromage|raclette|fondue/, "🧀"], [/glace|sorbet/, "🍨"], [/cookie|biscuit/, "🍪"], [/chocolat|brownie|fondant/, "🍫"],
+  [/gateau|tarte|cheesecake|tiramisu|patisserie|clafoutis|eclair|cake|moelleux|flan/, "🍰"],
+  [/yaourt|granola|muesli|porridge|cereale/, "🥣"], [/apero|cocktail/, "🥂"], [/focaccia|tartine|toast|pain|baguette/, "🍞"],
+  [/butternut|chou-fleur|legume|brocoli|courgette|ratatouille|aubergine/, "🥦"], [/avocat|guacamole/, "🥑"],
+  [/banane/, "🍌"], [/pomme|poire/, "🍎"], [/fraise|framboise|fruits rouges/, "🍓"], [/fruit/, "🍇"],
+  [/cafe|cappuccino/, "☕"], [/\bthe\b|tisane/, "🍵"], [/smoothie|\bjus\b/, "🥤"],
+];
+function dishEmoji(name) {
+  const n = normalizeText(name || "");
+  let best = null;
+  DISH_EMOJI_RULES.forEach(([re, emoji], order) => {
+    const m = re.exec(n);
+    if (m && (!best || m.index < best.index)) best = { index: m.index, emoji, order };
+  });
+  return best ? best.emoji : null;
+}
+function guessEmoji(meal) {
+  return meal.emojiCustom || dishEmoji(meal.name) || DEFAULT_EMOJI[meal.type] || "🍽️";
+}
 function photoBg(meal) {
   return meal.photo ? "transparent" : (meal.color || "var(--accent-soft)");
 }
@@ -151,7 +185,7 @@ function preparedLabel(meal) {
   if (meal.preparedBy === "Un proche") return meal.preparer ? `Par ${meal.preparer}` : "Par un proche";
   if (meal.preparedBy === "Livraison") return meal.preparer ? `Livré par ${meal.preparer}` : "En livraison";
   if (meal.preparedBy === "Autre") return meal.preparer || "Autre";
-  return meal.preparer ? `Chez ${meal.preparer}` : "Au restaurant";
+  return meal.preparer || "Au restaurant";
 }
 // Couleur de bordure des miniatures selon qui a préparé le repas
 function prepClass(meal) {
@@ -300,7 +334,8 @@ function openDetail(id) {
   const ingredients = meal.ingredients || [];
   const prepared = preparedLabel(meal);
   detailContent.innerHTML = `
-    <div class="detail-photo${meal.photo ? " full" : ""}" style="background:${photoBg(meal)}">${photoHtml(meal)}</div>
+    <div class="detail-photo${meal.photo ? " full" : ""}" style="background:${photoBg(meal)}">${photoHtml(meal)}${meal.photo ? "" : `<button type="button" class="emoji-edit" data-emoji-edit="${escapeHtml(meal.id)}">Changer l'emoji</button>`}</div>
+    <div class="emoji-picker" id="emojiPicker" hidden></div>
     <h2 class="modal-title" style="margin-bottom:0">${escapeHtml(meal.name)}</h2>
     <div class="detail-meta">
       <span class="tag">${escapeHtml(mealMoment(meal))}</span>
@@ -323,6 +358,9 @@ function openDetail(id) {
 }
 
 detailContent.addEventListener("click", async e => {
+  if (e.target.closest("[data-emoji-edit]")) { toggleEmojiPicker(e.target.closest("[data-emoji-edit]").dataset.emojiEdit); return; }
+  const pick = e.target.closest("[data-pick-emoji]");
+  if (pick) { setMealEmoji(pick.closest("#emojiPicker").dataset.meal, pick.dataset.pickEmoji); return; }
   const open = e.target.closest("[data-open-meal]");
   if (open) { openDetail(open.dataset.openMeal); return; }
   const addDay = e.target.closest("[data-add-day]");
@@ -338,6 +376,31 @@ detailContent.addEventListener("click", async e => {
   refresh();
   notify("Repas supprimé.");
 });
+
+// ---------- Changer l'emoji d'un repas sans photo ----------
+const EMOJI_CHOICES = ["🍕", "🍔", "🍟", "🌭", "🥪", "🌮", "🌯", "🥙", "🧆", "🥗", "🍝", "🍜", "🍲", "🍛", "🍚", "🍙", "🍱", "🍣", "🍤", "🥟",
+  "🥘", "🍳", "🥞", "🥐", "🍞", "🥯", "🧀", "🥩", "🍗", "🍖", "🐟", "🦪", "🥦", "🥕", "🥔", "🍆", "🍄", "🥑", "🍎", "🍓",
+  "🍌", "🍰", "🥧", "🍫", "🍪", "🍨", "🥣", "☕", "🍵", "🥤", "🍷", "🍺", "🥂", "🍽️"];
+function toggleEmojiPicker(mealId) {
+  const picker = document.getElementById("emojiPicker");
+  const meal = meals.find(m => m.id === mealId);
+  if (!picker || !meal) return;
+  if (!picker.hidden) { picker.hidden = true; return; }
+  const current = guessEmoji(meal);
+  picker.dataset.meal = mealId;
+  picker.innerHTML = `
+    <div class="emoji-grid">${EMOJI_CHOICES.map(e => `<button type="button" class="emoji-choice${e === current ? " on" : ""}" data-pick-emoji="${e}" aria-label="Choisir ${e}">${e}</button>`).join("")}</div>
+    ${meal.emojiCustom ? `<button type="button" class="link-inline" data-pick-emoji="">Revenir à l'emoji automatique (${escapeHtml(dishEmoji(meal.name) || DEFAULT_EMOJI[meal.type] || "🍽️")})</button>` : ""}`;
+  picker.hidden = false;
+}
+function setMealEmoji(mealId, emoji) {
+  const meal = meals.find(m => m.id === mealId);
+  if (!meal) return;
+  if (emoji) meal.emojiCustom = emoji; else delete meal.emojiCustom;
+  saveMeals();
+  refresh();
+  openDetail(mealId);
+}
 
 // Liste de tous les repas d'un jour (vignette « +N »)
 function openDayList(dateIso) {
@@ -465,6 +528,7 @@ function fillDraftFromMeal(meal) {
   form.notes.value = meal.notes || "";
   draft.photo = meal.photo || null;
   draft.thumb = meal.thumb || null;
+  draft.emojiCustom = meal.emojiCustom || "";
   draft.photoBlob = meal.photo ? dataUrlToBlob(meal.photo) : null;
   draft.rating = meal.rating || 0;
   draft.course = meal.course || "Plat";
@@ -1615,6 +1679,7 @@ form.addEventListener("submit", e => {
     course: COURSE_MEALS.includes(type) ? draft.course : "",
     photo: draft.photo,
     thumb: draft.photo ? draft.thumb : null,
+    ...(draft.emojiCustom && !draft.photo ? { emojiCustom: draft.emojiCustom } : {}),
     emoji: null, // calculé à l'affichage (guessEmoji) quand il n'y a pas de photo
     color: null,
     preparedBy: preparedBy.value,
@@ -1780,6 +1845,7 @@ function saveLeftover() {
     course: COURSE_MEALS.includes(type) ? (draft.course || src.course || "Plat") : "",
     photo: src.photo || null,
     thumb: src.thumb || null,
+    ...(src.emojiCustom ? { emojiCustom: src.emojiCustom } : {}),
     emoji: null,
     color: null,
     preparedBy: src.preparedBy || "Moi",
