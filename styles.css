@@ -909,7 +909,10 @@ h1, h2 { font-family: Fraunces, Georgia, serif; font-weight: 500; margin: 0; }
 
 /* Barres : « % » (même hauteur) ou « Absolu » (selon le nombre de repas) */
 .seg.small button { padding: 4px 10px; font-size: 12px; }
-.card-head .seg.small { margin-left: auto; }
+/* Ligne 1 : titre + 6 mois glissants · ligne 2 : % / Absolu */
+.card-head .period-nav.small { margin-left: auto; }
+.card-head .seg.small { flex-basis: auto; order: 3; }
+.card-head::after { content: ""; flex-basis: 100%; order: 2; }
 .bar-slot { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 6px; width: 100%; }
 .bar { transition: height .25s ease; }
 @media (prefers-reduced-motion: reduce) { .bar { transition: none; } }
@@ -917,3 +920,4 @@ h1, h2 { font-family: Fraunces, Georgia, serif; font-weight: 500; margin: 0; }
 /* Mois sélectionné dans les barres (= période de l'anneau et des classements) */
 .bar-col.selected .bar-label { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
 .bar-col.selected .bar { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--accent); border-radius: 4px; }
+.card-head { row-gap: 5px; }
