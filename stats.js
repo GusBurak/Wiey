@@ -56,6 +56,8 @@ function generateDemoMeals() {
     ["Maman", [["Lasagnes", ["Pâtes", "Bœuf haché", "Sauce tomate", "Parmesan"]], ["Blanquette de veau", ["Veau", "Carotte", "Champignon", "Crème fraîche", "Riz"]]]],
     ["Léa", [["Couscous", ["Semoule", "Poulet", "Carotte", "Courgette", "Pois chiche"]], ["Tajine", ["Poulet", "Citron", "Olive", "Oignon"]]]],
     ["Paul", [["Burger maison", ["Pain burger", "Bœuf haché", "Cheddar", "Salade", "Tomate"]]]],
+    ["Papa", [["Côte de bœuf", ["Bœuf", "Pomme de terre", "Salade"]], ["Paella", ["Riz", "Crevette", "Poulet", "Poivron"]]]],
+    ["Mamie", [["Pot-au-feu", ["Bœuf", "Carotte", "Poireau", "Navet"]], ["Tarte aux pommes", ["Pâte brisée", "Pomme", "Sucre"]]]],
   ];
   const RESTOS = [
     ["Chez Gino", "Pizza napolitaine", ["Pâte à pizza", "Mozzarella", "Sauce tomate", "Basilic"], 5],
@@ -65,6 +67,8 @@ function generateDemoMeals() {
     ["Big Mamma", "Pâtes à la truffe", ["Pâtes", "Parmesan", "Champignon", "Crème fraîche"], 2],
     ["Le Comptoir", "Croque-monsieur", ["Pain de mie", "Jambon", "Emmental", "Salade"], 2],
     ["Burger Theory", "Cheeseburger", ["Pain burger", "Bœuf haché", "Cheddar", "Frite"], 2],
+    ["La Crêperie", "Galette complète", ["Farine", "Jambon", "Œuf", "Emmental"], 2],
+    ["Istanbul Grill", "Kebab assiette", ["Agneau", "Frite", "Salade", "Sauce blanche"], 2],
   ];
   const DELIVERY = [
     ["Thaï Express", "Pad thaï", ["Nouille de riz", "Crevette", "Cacahuète", "Œuf"]],
@@ -97,13 +101,13 @@ function generateDemoMeals() {
       const by = type === "Déjeuner" && !weekend
         ? weighted([["Moi", 35], ["Autre", 26], ["Un resto", 22], ["Livraison", 10], ["Un proche", 7]])
         : weekend
-          ? weighted([["Moi", 40], ["Un proche", 25], ["Un resto", 22], ["Livraison", 10], ["Autre", 3]])
-          : weighted([["Moi", 58], ["Un proche", 12], ["Un resto", 10], ["Livraison", 16], ["Autre", 4]]);
+          ? weighted([["Moi", 36], ["Un proche", 28], ["Un resto", 24], ["Livraison", 9], ["Autre", 3]])
+          : weighted([["Moi", 54], ["Un proche", 14], ["Un resto", 13], ["Livraison", 15], ["Autre", 4]]);
       if (by === "Moi") {
         if (lastHome && rnd() < 0.18) { add(type, "Moi", "", lastHome[0], lastHome[1], { leftover: true }); return; }
         const dish = pick(HOME); lastHome = dish; add(type, "Moi", "", dish[0], dish[1]); return;
       }
-      if (by === "Un proche") { const [who, dishes] = weighted(FAMILY.map(f => [f, f[0] === "Maman" ? 5 : f[0] === "Léa" ? 3 : 2])); const dish = pick(dishes); add(type, by, who, dish[0], dish[1]); return; }
+      if (by === "Un proche") { const [who, dishes] = weighted(FAMILY.map(f => [f, { Maman: 5, "Léa": 3, Paul: 2, Papa: 3, Mamie: 2 }[f[0]] || 1])); const dish = pick(dishes); add(type, by, who, dish[0], dish[1]); return; }
       if (by === "Un resto") { const r = weighted(RESTOS.map(x => [x, x[3]])); add(type, by, r[0], r[1], r[2]); return; }
       if (by === "Livraison") { const r = pick(DELIVERY); add(type, by, r[0], r[1], r[2]); return; }
       const o = weighted(OTHER.map(x => [x, x[2]])); add(type, "Autre", o[0], o[1][0], []);
@@ -235,26 +239,39 @@ function renderBars(all) {
     }
     return `<div class="bar-col">
       <span class="bar-count">${total} repas</span>
-      <div class="bar${total ? "" : " empty"}" style="height:${H}px">${segs}</div>
-      <span class="bar-label">${label}</span>
+      <div class="bar${total ? "" : " empty"}" style="height:${H}px" data-goto-month="${key}">${segs}</div>
+      <button type="button" class="bar-label" data-goto-month="${key}" aria-label="Voir ${longLabel} dans le calendrier">${label}</button>
     </div>`;
   }).join("");
   el.innerHTML = `<div class="bars" role="img" aria-label="Répartition par mois de qui a préparé les repas">${cols}</div>
     <ul class="legend-list inline">${PREP_ORDER.map(p => `<li><i class="sw" style="background:${prepColor(p.key)}"></i><span>${p.label}</span></li>`).join("")}</ul>`;
   bindTips(el);
+  el.querySelectorAll("[data-goto-month]").forEach(x => x.addEventListener("click", () => openMonthInCalendar(x.dataset.gotoMonth)));
+}
+
+// Clic sur un mois : on ouvre le calendrier sur ce mois
+function openMonthInCalendar(key) {
+  const [y, m] = key.split("-").map(Number);
+  hideTip();
+  viewDate = new Date(y, m - 1, 1);
+  goHome();
+  if (useDemo()) notify("Le calendrier montre tes vrais repas : les données d'exemple n'y apparaissent pas.");
 }
 
 // ---------- Classements ----------
 function rankHtml(rows, color, emptyText) {
   if (!rows.length) return `<p class="empty-chart">${emptyText}</p>`;
   const max = Math.max(...rows.map(r => r.n));
+  // Toujours 5 lignes : les places vides restent visibles pour garder la même hauteur
+  const fillers = Array.from({ length: Math.max(0, 5 - rows.length) }, (_, k) => `
+    <li class="placeholder" aria-hidden="true"><span class="rank-pos">${rows.length + k + 1}</span><span class="rank-name">—</span><span class="rank-bar"></span><span class="rank-val"></span></li>`).join("");
   return `<ol class="rank-list">${rows.map((r, i) => `
     <li tabindex="0" data-tip="${escapeHtml(`<strong>${escapeHtml(r.label)}</strong><span class="tip-row">${r.n} ${r.unit || "repas"}</span>`)}">
       <span class="rank-pos">${i + 1}</span>
       <span class="rank-name">${escapeHtml(r.label)}${r.sub ? `<small>${escapeHtml(r.sub)}</small>` : ""}</span>
       <span class="rank-bar"><span style="width:${Math.max(4, (r.n / max) * 100)}%;background:${r.color || color}"></span></span>
       <span class="rank-val">${r.n}</span>
-    </li>`).join("")}</ol>`;
+    </li>`).join("")}${fillers}</ol>`;
 }
 function renderRankings(list) {
   const own = list.filter(m => !m.leftover);
@@ -272,12 +289,12 @@ function renderRankings(list) {
   const topRestos = [...restos].sort((a, b) => b[1] - a[1]).slice(0, 5).map(([label, n]) => ({ label, n, unit: n > 1 ? "visites" : "visite" }));
   const restoEl = document.getElementById("rankRestos");
   restoEl.innerHTML = rankHtml(topRestos, prepColor("Un resto"), "Aucun resto sur cette période.");
-  // 3. Qui m'a fait à manger : moi + les 2 proches qui ont le plus cuisiné
+  // 3. Qui m'a fait à manger : moi + les 4 proches qui ont le plus cuisiné (top 5)
   const mine = own.filter(m => (m.preparedBy || "Moi") === "Moi").length;
   const cooks = new Map();
   own.filter(m => m.preparedBy === "Un proche").forEach(m => { const k = m.preparer || "Un proche"; cooks.set(k, (cooks.get(k) || 0) + 1); });
   const topCooks = [{ label: "Moi", n: mine, color: prepColor("Moi") },
-    ...[...cooks].sort((a, b) => b[1] - a[1]).slice(0, 2).map(([label, n]) => ({ label, n, color: prepColor("Un proche") }))]
+    ...[...cooks].sort((a, b) => b[1] - a[1]).slice(0, 4).map(([label, n]) => ({ label, n, color: prepColor("Un proche") }))]
     .filter(r => r.n).sort((a, b) => b.n - a.n);
   const cookEl = document.getElementById("rankCooks");
   cookEl.innerHTML = rankHtml(topCooks, prepColor("Moi"), "Aucun repas fait maison ou par un proche sur cette période.");
