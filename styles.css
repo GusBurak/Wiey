@@ -898,3 +898,9 @@ h1, h2 { font-family: Fraunces, Georgia, serif; font-weight: 500; margin: 0; }
 .emoji-choice { border: 1px solid transparent; background: none; border-radius: 8px; font-size: 22px; height: 38px; line-height: 1; }
 .emoji-choice:hover { background: var(--hover); }
 .emoji-choice.on { border-color: var(--accent); background: var(--accent-soft); }
+
+/* En-tête de carte avec navigation (6 mois glissants) */
+.card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
+.card-head h2 { margin: 0; }
+.period-nav.small .icon-btn { width: 28px; height: 28px; }
+.period-nav.small .period-label { min-width: 120px; font-size: 13px; text-transform: none; }

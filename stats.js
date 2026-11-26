@@ -18,6 +18,7 @@ const statsState = {
   mode: "month",                      // "month" | "year"
   anchor: new Date(),                 // un jour dans la période affichée
   initialized: false,
+  barsEnd: null,                      // dernier mois des 6 mois glissants (indépendant de la période)
 };
 
 function prepColor(key) {
@@ -111,11 +112,7 @@ function renderDonut(list) {
 // ---------- Barres 100 % : 6 derniers mois ----------
 function renderBars(all) {
   const el = document.getElementById("barsChart");
-  const now = new Date();
-  let endMonth = statsState.mode === "year"
-    ? new Date(statsState.anchor.getFullYear(), 11, 1)
-    : new Date(statsState.anchor.getFullYear(), statsState.anchor.getMonth(), 1);
-  if (endMonth > now) endMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const endMonth = statsState.barsEnd;
   const months = [];
   for (let i = 5; i >= 0; i--) months.push(new Date(endMonth.getFullYear(), endMonth.getMonth() - i, 1));
   const H = 180;
@@ -143,6 +140,12 @@ function renderBars(all) {
       <button type="button" class="bar-label" data-goto-month="${key}" aria-label="Voir ${longLabel} dans le calendrier">${label}</button>
     </div>`;
   }).join("");
+  const first = months[0], last = months[5];
+  const short = d => d.toLocaleDateString("fr-FR", { month: "short", year: "numeric" });
+  document.getElementById("barsLabel").textContent = first.getFullYear() === last.getFullYear()
+    ? `${MONTHS_FR[first.getMonth()]} – ${short(last)}` : `${short(first)} – ${short(last)}`;
+  const now = new Date();
+  document.getElementById("barsNext").disabled = last.getFullYear() > now.getFullYear() || (last.getFullYear() === now.getFullYear() && last.getMonth() >= now.getMonth());
   el.innerHTML = `<div class="bars" role="img" aria-label="Répartition par mois de qui a préparé les repas">${cols}</div>
     <ul class="legend-list inline">${PREP_ORDER.map(p => `<li><i class="sw" style="background:${prepColor(p.key)}"></i><span>${p.label}</span></li>`).join("")}</ul>`;
   bindTips(el);
@@ -211,6 +214,8 @@ function renderStats() {
       const [y, mo] = latest.split("-").map(Number);
       statsState.anchor = new Date(y, mo - 1, 1);
     }
+    // Les 6 mois glissants finissent au même mois que la période affichée au départ
+    statsState.barsEnd = new Date(statsState.anchor.getFullYear(), statsState.anchor.getMonth(), 1);
   }
   const range = periodRange();
   document.getElementById("periodLabel").textContent = range.label;
@@ -225,6 +230,14 @@ function renderStats() {
 
 document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("periodPrev").addEventListener("click", () => shiftPeriod(-1));
+  const shiftBars = step => {
+    const e = statsState.barsEnd;
+    statsState.barsEnd = new Date(e.getFullYear(), e.getMonth() + step, 1);
+    hideTip();
+    renderBars(statsMeals());
+  };
+  document.getElementById("barsPrev").addEventListener("click", () => shiftBars(-1));
+  document.getElementById("barsNext").addEventListener("click", () => shiftBars(1));
   document.getElementById("periodNext").addEventListener("click", () => shiftPeriod(1));
   document.getElementById("periodMode").addEventListener("click", e => {
     const b = e.target.closest("[data-mode]");
