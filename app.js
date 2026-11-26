@@ -93,6 +93,26 @@ const saveMeals = () => save(KEYS.meals, meals);
   if (r.length !== restaurants.length) { restaurants = r; save(KEYS.restaurants, restaurants); }
 })();
 
+// Import unique des repas de janvier à mars 2026 (tableau Excel) : ajoutés une seule fois,
+// sans doublon ni modification des repas déjà saisis. Un repas importé puis supprimé ne revient pas.
+(function importSpreadsheet() {
+  if (typeof buildImportedMeals !== "function") return;
+  let done = null;
+  try { done = localStorage.getItem("wiey.imported"); } catch (e) { return; }
+  if (done === IMPORT_2026Q1_KEY) return;
+  const existing = new Set(meals.map(m => m.id));
+  const added = buildImportedMeals().filter(m => !existing.has(m.id));
+  meals.push(...added);
+  // Les restos rejoignent la liste des restos enregistrés
+  const restos = new Set(restaurants);
+  added.filter(m => m.preparedBy === "Un resto" && m.preparer).forEach(m => restos.add(m.preparer));
+  restaurants = [...restos].sort((a, b) => a.localeCompare(b, "fr"));
+  if (saveMeals()) {
+    save(KEYS.restaurants, restaurants);
+    try { localStorage.setItem("wiey.imported", IMPORT_2026Q1_KEY); } catch (e) { /* ignoré */ }
+  }
+})();
+
 // ---------- Utilitaires ----------
 function iso(d) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;

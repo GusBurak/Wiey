@@ -2,7 +2,6 @@
 // Statistiques : tableau de bord
 // - à gauche : qui a préparé (anneau) + répartition sur 6 mois (barres 100 %)
 // - à droite : classements (ingrédients, restos, qui m'a fait à manger)
-// Les « données d'exemple » sont générées en mémoire : rien n'est enregistré.
 // =====================================================
 
 // Ordre fixe des catégories (couleurs de la légende du calendrier)
@@ -18,9 +17,8 @@ const MONTHS_FR = ["janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "a
 const statsState = {
   mode: "month",                      // "month" | "year"
   anchor: new Date(),                 // un jour dans la période affichée
-  demo: null,                         // null = choix automatique
+  initialized: false,
 };
-let demoMealsCache = null;
 
 function prepColor(key) {
   const p = PREP_ORDER.find(x => x.key === key) || PREP_ORDER[0];
@@ -29,105 +27,7 @@ function prepColor(key) {
 function pct(n, total) { return total ? Math.round((n / total) * 100) : 0; }
 function ymd(d) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; }
 
-// ---------- Données d'exemple (déterministes) ----------
-function generateDemoMeals() {
-  let seed = 20260101;
-  const rnd = () => ((seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648);
-  const pick = arr => arr[Math.floor(rnd() * arr.length)];
-  const weighted = pairs => { let r = rnd() * pairs.reduce((a, [, w]) => a + w, 0); for (const [v, w] of pairs) if ((r -= w) < 0) return v; return pairs[0][0]; };
-
-  const HOME = [
-    ["Pâtes carbonara", ["Pâtes", "Lardon", "Œuf", "Parmesan", "Poivre"]],
-    ["Poulet rôti", ["Poulet", "Pomme de terre", "Ail", "Thym"]],
-    ["Salade composée", ["Salade", "Tomate", "Concombre", "Feta", "Huile d'olive"]],
-    ["Curry de lentilles", ["Lentille corail", "Lait de coco", "Curry", "Oignon", "Riz basmati"]],
-    ["Omelette", ["Œuf", "Fromage râpé", "Ciboulette"]],
-    ["Risotto aux champignons", ["Riz arborio", "Champignon", "Parmesan", "Oignon"]],
-    ["Soupe de légumes", ["Carotte", "Poireau", "Pomme de terre", "Oignon"]],
-    ["Saumon et riz", ["Saumon", "Riz", "Brocoli", "Citron"]],
-    ["Tacos maison", ["Tortilla", "Bœuf haché", "Tomate", "Oignon", "Fromage râpé"]],
-    ["Pizza maison", ["Pâte à pizza", "Sauce tomate", "Mozzarella", "Basilic"]],
-    ["Quiche lorraine", ["Pâte brisée", "Lardon", "Œuf", "Crème fraîche"]],
-    ["Bowl poulet avocat", ["Poulet", "Avocat", "Riz", "Tomate cerise"]],
-    ["Pâtes au pesto", ["Pâtes", "Pesto", "Parmesan", "Tomate cerise"]],
-    ["Gratin dauphinois", ["Pomme de terre", "Crème fraîche", "Ail", "Fromage râpé"]],
-  ];
-  const FAMILY = [
-    ["Maman", [["Lasagnes", ["Pâtes", "Bœuf haché", "Sauce tomate", "Parmesan"]], ["Blanquette de veau", ["Veau", "Carotte", "Champignon", "Crème fraîche", "Riz"]]]],
-    ["Léa", [["Couscous", ["Semoule", "Poulet", "Carotte", "Courgette", "Pois chiche"]], ["Tajine", ["Poulet", "Citron", "Olive", "Oignon"]]]],
-    ["Paul", [["Burger maison", ["Pain burger", "Bœuf haché", "Cheddar", "Salade", "Tomate"]]]],
-    ["Papa", [["Côte de bœuf", ["Bœuf", "Pomme de terre", "Salade"]], ["Paella", ["Riz", "Crevette", "Poulet", "Poivron"]]]],
-    ["Mamie", [["Pot-au-feu", ["Bœuf", "Carotte", "Poireau", "Navet"]], ["Tarte aux pommes", ["Pâte brisée", "Pomme", "Sucre"]]]],
-  ];
-  const RESTOS = [
-    ["Chez Gino", "Pizza napolitaine", ["Pâte à pizza", "Mozzarella", "Sauce tomate", "Basilic"], 5],
-    ["Sushi Kyo", "Plateau sushi", ["Riz vinaigré", "Saumon", "Algue nori", "Avocat"], 4],
-    ["Le Petit Bistrot", "Entrecôte frites", ["Bœuf", "Frite", "Salade"], 3],
-    ["Pho 14", "Pho au bœuf", ["Nouille de riz", "Bœuf", "Coriandre", "Citron vert"], 3],
-    ["Big Mamma", "Pâtes à la truffe", ["Pâtes", "Parmesan", "Champignon", "Crème fraîche"], 2],
-    ["Le Comptoir", "Croque-monsieur", ["Pain de mie", "Jambon", "Emmental", "Salade"], 2],
-    ["Burger Theory", "Cheeseburger", ["Pain burger", "Bœuf haché", "Cheddar", "Frite"], 2],
-    ["La Crêperie", "Galette complète", ["Farine", "Jambon", "Œuf", "Emmental"], 2],
-    ["Istanbul Grill", "Kebab assiette", ["Agneau", "Frite", "Salade", "Sauce blanche"], 2],
-  ];
-  const DELIVERY = [
-    ["Thaï Express", "Pad thaï", ["Nouille de riz", "Crevette", "Cacahuète", "Œuf"]],
-    ["Poké Lab", "Poké bowl saumon", ["Riz", "Saumon", "Avocat", "Edamame"]],
-    ["Pizza Hut", "Pizza pepperoni", ["Pâte à pizza", "Mozzarella", "Chorizo", "Sauce tomate"]],
-    ["Bollywood", "Butter chicken", ["Poulet", "Riz basmati", "Crème liquide", "Curry"]],
-  ];
-  const OTHER = [["Cantine du bureau", ["Plat du jour"], 6], ["Food truck", ["Wrap poulet"], 1]];
-  const BREAKFAST = [["Tartines", ["Pain", "Beurre", "Confiture"]], ["Yaourt granola", ["Yaourt", "Granola", "Fruits rouges"]], ["Porridge", ["Flocon d'avoine", "Lait", "Banane"]]];
-  const SNACK = [["Pomme", ["Pomme"]], ["Crêpes", ["Farine", "Œuf", "Lait", "Sucre"]]];
-
-  const meals = [];
-  const today = new Date();
-  const end = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1);
-  // Moins de saisie certains mois (oublis), quasiment rien pendant les vacances d'août
-  const monthFill = [0.95, 0.9, 0.7, 0.9, 0.85, 0.8, 0.75, 0.45, 0.9, 0.85, 0.9, 0.9];
-  let id = 0, lastHome = null;
-  for (let d = new Date(today.getFullYear(), 0, 1); d <= end; d.setDate(d.getDate() + 1)) {
-    const m = d.getMonth(), wd = d.getDay(), weekend = wd === 0 || wd === 6;
-    const vacation = m === 7 && d.getDate() >= 4 && d.getDate() <= 16;
-    if (vacation && rnd() < 0.85) continue;
-    if (rnd() > monthFill[m]) continue;                        // journée oubliée
-    const date = ymd(d);
-    const add = (type, by, preparer, name, ingredients, extra = {}) => meals.push({
-      id: `demo-stats-${id++}`, name, date, type, course: type === "Déjeuner" || type === "Dîner" ? "Plat" : "",
-      preparedBy: by, preparer, photo: null, rating: Math.round((3 + rnd() * 2) * 2) / 2,
-      ingredients: ingredients.map(n => ({ name: n, qty: "", group: "" })), ...extra,
-    });
-    const meal = type => {
-      const by = type === "Déjeuner" && !weekend
-        ? weighted([["Moi", 35], ["Autre", 26], ["Un resto", 22], ["Livraison", 10], ["Un proche", 7]])
-        : weekend
-          ? weighted([["Moi", 36], ["Un proche", 28], ["Un resto", 24], ["Livraison", 9], ["Autre", 3]])
-          : weighted([["Moi", 54], ["Un proche", 14], ["Un resto", 13], ["Livraison", 15], ["Autre", 4]]);
-      if (by === "Moi") {
-        if (lastHome && rnd() < 0.18) { add(type, "Moi", "", lastHome[0], lastHome[1], { leftover: true }); return; }
-        const dish = pick(HOME); lastHome = dish; add(type, "Moi", "", dish[0], dish[1]); return;
-      }
-      if (by === "Un proche") { const [who, dishes] = weighted(FAMILY.map(f => [f, { Maman: 5, "Léa": 3, Paul: 2, Papa: 3, Mamie: 2 }[f[0]] || 1])); const dish = pick(dishes); add(type, by, who, dish[0], dish[1]); return; }
-      if (by === "Un resto") { const r = weighted(RESTOS.map(x => [x, x[3]])); add(type, by, r[0], r[1], r[2]); return; }
-      if (by === "Livraison") { const r = pick(DELIVERY); add(type, by, r[0], r[1], r[2]); return; }
-      const o = weighted(OTHER.map(x => [x, x[2]])); add(type, "Autre", o[0], o[1][0], []);
-    };
-    if (rnd() < 0.18) { const b = pick(BREAKFAST); add("Petit-déjeuner", "Moi", "", b[0], b[1]); }
-    if (rnd() < 0.86) meal("Déjeuner");
-    if (rnd() < 0.08) { const s = pick(SNACK); add("Goûter", "Moi", "", s[0], s[1]); }
-    if (rnd() < 0.88) meal("Dîner");
-  }
-  return meals;
-}
-
-function statsMeals() {
-  if (useDemo()) return demoMealsCache || (demoMealsCache = generateDemoMeals());
-  return meals;
-}
-function useDemo() {
-  if (statsState.demo !== null) return statsState.demo;
-  return meals.length < 30; // peu de vrais repas : on montre l'exemple par défaut
-}
+function statsMeals() { return meals; }
 
 // ---------- Période ----------
 function periodRange() {
@@ -255,7 +155,6 @@ function openMonthInCalendar(key) {
   hideTip();
   viewDate = new Date(y, m - 1, 1);
   goHome();
-  if (useDemo()) notify("Le calendrier montre tes vrais repas : les données d'exemple n'y apparaissent pas.");
 }
 
 // ---------- Classements ----------
@@ -303,9 +202,16 @@ function renderRankings(list) {
 
 // ---------- Rendu global ----------
 function renderStats() {
-  const demo = useDemo();
-  document.getElementById("demoToggle").checked = demo;
-  document.getElementById("demoBanner").hidden = !demo;
+  // Première ouverture : si le mois en cours est vide, on se place sur le dernier mois qui a des repas
+  if (!statsState.initialized) {
+    statsState.initialized = true;
+    const thisMonth = ymd(new Date()).slice(0, 7);
+    const latest = meals.map(m => m.date).sort().pop();
+    if (latest && !meals.some(m => m.date.startsWith(thisMonth))) {
+      const [y, mo] = latest.split("-").map(Number);
+      statsState.anchor = new Date(y, mo - 1, 1);
+    }
+  }
   const range = periodRange();
   document.getElementById("periodLabel").textContent = range.label;
   document.querySelectorAll("#periodMode [data-mode]").forEach(b => b.setAttribute("aria-checked", String(b.dataset.mode === statsState.mode)));
@@ -326,5 +232,4 @@ document.addEventListener("DOMContentLoaded", () => {
     statsState.mode = b.dataset.mode;
     renderStats();
   });
-  document.getElementById("demoToggle").addEventListener("change", e => { statsState.demo = e.target.checked; renderStats(); });
 });
